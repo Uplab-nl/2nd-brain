@@ -505,6 +505,7 @@
         <div class="menu-wrap">
           <button class="menu-btn" onclick="toggleMenu('dashMenu')" title="Meer opties">&#9776;</button>
           <div class="dropdown-menu hidden" id="dashMenu">
+            <button class="act" id="googleConnBtn" onclick="connectGoogleCalendar()" title="Koppel je Google Agenda zodat afspraken automatisch met Meet-link worden aangemaakt"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128197;</span><span class="lbl">Google Agenda koppelen</span></button>
             <button class="act" id="backupBtn" onclick="exportBackup(this)" title="Download al je data als JSON-bestand"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span><span class="lbl">Backup downloaden</span></button>
             <button class="act" id="dashEditBtn" onclick="toggleDashEdit()"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="lbl">Blokken aanpassen</span></button>
           </div>
@@ -698,6 +699,42 @@
   const SUPABASE_URL='https://stsmbpgtdtzscpswbwww.supabase.co';
   const SUPABASE_KEY='sb_publishable_pfjTF-UQP0juprQ0lHPodA_bgUBFDZ9';
   const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  // ================= GOOGLE AGENDA-KOPPELING =================
+  const GOOGLE_CLIENT_ID='945460576637-lnf92190ih75qt305dhdaaeagq08c39e.apps.googleusercontent.com';
+  const GOOGLE_REDIRECT_URI='https://uplab-nl.github.io/2nd-brain/';
+  let googleConnected=false;
+  function connectGoogleCalendar(){
+    const params=new URLSearchParams({
+      client_id:GOOGLE_CLIENT_ID, redirect_uri:GOOGLE_REDIRECT_URI, response_type:'code',
+      scope:'https://www.googleapis.com/auth/calendar.events', access_type:'offline', prompt:'consent',
+    });
+    window.location.href='https://accounts.google.com/o/oauth2/v2/auth?'+params.toString();
+  }
+  async function refreshGoogleStatusUI(){
+    try{
+      const { data, error }=await sb.functions.invoke('google-status',{ body:{} });
+      googleConnected=!error && !data?.error && !!data?.connected;
+    }catch(_e){ googleConnected=false; }
+    const el=$('googleConnBtn'); if(!el) return;
+    el.innerHTML=googleConnected
+      ?'<span class="mi" style="background:linear-gradient(135deg,#3dd6b0,#5a9cff)">\u2713</span><span class="lbl">Google Agenda gekoppeld</span>'
+      :'<span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">\u{1F4C5}</span><span class="lbl">Google Agenda koppelen</span>';
+  }
+  async function handleGoogleOAuthCallback(){
+    const url=new URL(window.location.href);
+    const code=url.searchParams.get('code');
+    if(!code) return;
+    url.searchParams.delete('code'); url.searchParams.delete('scope'); url.searchParams.delete('state');
+    window.history.replaceState({},document.title,url.pathname+url.search);
+    try{
+      const { data, error }=await sb.functions.invoke('google-oauth-callback',{ body:{ code, redirect_uri:GOOGLE_REDIRECT_URI } });
+      if(error||data?.error) throw new Error(data?.error||error.message);
+      await refreshGoogleStatusUI();
+      alert('Google Agenda gekoppeld. Afspraken kunnen er nu automatisch in.');
+    }catch(e){
+      alert('Koppelen mislukt: '+e.message);
+    }
+  }
   if('serviceWorker' in navigator){
     window.addEventListener('load',()=>{ navigator.serviceWorker.register('service-worker.js').catch(()=>{}); });
   }
@@ -840,7 +877,7 @@
     if(error){ loginErr.textContent='Inloggen mislukt: controleer je e-mail en wachtwoord.'; loginBtn.disabled=false; loginBtn.textContent='Inloggen'; return; }
     showApp();
   }
-  async function showApp(){ loginScreen.classList.add('hidden'); app.classList.remove('hidden'); await loadNotebooks(); await loadCoacheeList(); await loadTemplateList(); await loadRecBuckets(); await loadNotesIndex(); await loadBuckets(); switchTab('dash'); handleShareTarget(); }
+  async function showApp(){ loginScreen.classList.add('hidden'); app.classList.remove('hidden'); await loadNotebooks(); await loadCoacheeList(); await loadTemplateList(); await loadRecBuckets(); await loadNotesIndex(); await loadBuckets(); switchTab('dash'); handleShareTarget(); refreshGoogleStatusUI(); handleGoogleOAuthCallback(); }
   async function doLogout(){ await sb.auth.signOut(); app.classList.add('hidden'); loginScreen.classList.remove('hidden'); loginBtn.disabled=false; loginBtn.textContent='Inloggen'; $('password').value=''; }
   loginBtn.addEventListener('click',doLogin);
   $('password').addEventListener('keydown',e=>{ if(e.key==='Enter')doLogin(); });
@@ -2152,27 +2189,48 @@
     const c=coachees.find(x=>x.id===id); if(!c) return;
     const now=new Date(); now.setDate(now.getDate()+1); now.setHours(10,0,0,0);
     const def=now.toISOString().slice(0,16);
+    const notConnected=!googleConnected;
     const body=`
-      <p style="color:var(--ink-soft);font-size:14px;margin-bottom:6px;">Plan een sessie met ${esc(first)}. Je krijgt een agenda-bestand (.ics) dat je in je agenda opent.</p>
+      ${notConnected?`<p style="background:var(--bg);border-radius:10px;padding:10px 12px;font-size:13.5px;margin-bottom:12px;">Je Google Agenda is nog niet gekoppeld \u2014 <a href="#" onclick="event.preventDefault();connectGoogleCalendar();">koppel 'm eerst</a>, dan gaat deze afspraak automatisch met Meet-link erin en krijgt ${esc(first)} een mailtje.</p>`:''}
+      <p style="color:var(--ink-soft);font-size:14px;margin-bottom:6px;">Plan een sessie met ${esc(first)}. Deze komt automatisch in je Google Agenda (met Meet-link)${c.email?`, en ${esc(first)} krijgt een mail met een 'zet in agenda'-knop`:''}.</p>
       <label>Titel</label><input type="text" id="mtTitle" value="Coachingsessie met ${esc(c.name)}">
       <label>Wanneer</label><input type="datetime-local" id="mtWhen" value="${def}">
       <label>Duur (minuten)</label><input type="text" id="mtDur" value="60">
-      <label>Locatie / link (optioneel)</label><input type="text" id="mtLoc" placeholder="Kantoor of videocall-link">
-      <div class="sheet-actions"><button class="act" id="mtCancel">Annuleren</button><button class="act primary" id="mtSave">\u{1F4C5} Zet in agenda</button></div>`;
+      <label>Notitie voor jezelf (optioneel, Dain leest 'm mee)</label><textarea id="mtNotes" placeholder="Waar wil je het over hebben\u2026"></textarea>
+      ${!c.email?`<p style="color:var(--ink-faint);font-size:12.5px;">Geen e-mailadres bekend bij ${esc(first)} \u2014 er gaat dan geen mail uit, wel gewoon de agenda-afspraak.</p>`:''}
+      <div class="sheet-actions"><button class="act" id="mtCancel">Annuleren</button><button class="act primary" id="mtSave" ${notConnected?'disabled':''}>\u{1F4C5} Zet in agenda</button></div>`;
     openSheet('\u{1F4C5} Meeting plannen', body, (ov,close)=>{
       $('mtCancel').onclick=close;
-      $('mtSave').onclick=()=>{ makeICS($('mtTitle').value,$('mtWhen').value,parseInt($('mtDur').value)||60,$('mtLoc').value,c.email); close(); };
+      $('mtSave').onclick=async()=>{
+        const btn=$('mtSave'); const orig=btn.innerHTML;
+        const title=$('mtTitle').value.trim(); if(!title){ alert('Geef de afspraak een titel.'); return; }
+        const when=$('mtWhen').value; if(!when){ alert('Kies een datum en tijd.'); return; }
+        const dur=parseInt($('mtDur').value)||60;
+        const start=new Date(when); const end=new Date(start.getTime()+dur*60000);
+        const notes=$('mtNotes').value.trim();
+        btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Bezig\u2026';
+        try{
+          const { data, error }=await sb.functions.invoke('create-appointment',{ body:{
+            coachee_id:id, title, start_time:start.toISOString(), end_time:end.toISOString(), notes:notes||null
+          }});
+          if(error||data?.error){
+            const msg=data?.error||error.message;
+            if(String(msg).includes('GOOGLE_NIET_GEKOPPELD')){ throw new Error("Google Agenda niet gekoppeld \u2014 klik rechtsboven in het menu op 'Google Agenda koppelen'."); }
+            throw new Error(msg);
+          }
+          close();
+          if(!$('coTimelineView').classList.contains('hidden')) openTimeline(id);
+        }catch(e){
+          btn.disabled=false; btn.innerHTML=orig;
+          alert('Kon afspraak niet inplannen: '+e.message);
+        }
+      };
     });
   }
-  function makeICS(title,whenLocal,dur,loc,email){
-    const start=new Date(whenLocal); const end=new Date(start.getTime()+dur*60000);
-    const fmt=d=>d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';
-    const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//SecondBrain//NL','BEGIN:VEVENT',
-      'UID:'+Date.now()+'@secondbrain','DTSTAMP:'+fmt(new Date()),'DTSTART:'+fmt(start),'DTEND:'+fmt(end),
-      'SUMMARY:'+title.replace(/\n/g,' '), loc?'LOCATION:'+loc.replace(/\n/g,' '):'', email?'ATTENDEE:mailto:'+email:'',
-      'END:VEVENT','END:VCALENDAR'].filter(Boolean).join('\r\n');
-    const blob=new Blob([ics],{type:'text/calendar'}); const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob); a.download=title.replace(/[^a-zA-Z0-9]/g,'_')+'.ics'; a.click(); URL.revokeObjectURL(a.href);
+  // Aantekening bij een afspraak opslaan + meteen door Dain laten indexeren
+  async function saveApptNotes(apptId,text){
+    await sb.from('appointments').update({ notes:text.trim()||null, updated_at:new Date().toISOString() }).eq('id',apptId);
+    embedContent('appointments',apptId);
   }
 
   function editCoachee(id){
@@ -2319,6 +2377,11 @@
       .eq('coachee_id',coacheeId);
     if(error){ $('coTimelineView').innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
 
+    // Alle geplande/gehad afspraken van deze coachee
+    const { data:appts }=await sb.from('appointments')
+      .select('id, title, start_time, end_time, meet_link, notes, status')
+      .eq('coachee_id',coacheeId).order('start_time',{ascending:false});
+
     const initials=(c.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
     let html=`<div class="tl-head">
       <button class="act" onclick="closeTimeline()">\u2190 Terug</button>
@@ -2331,19 +2394,31 @@
 
     if(recs && recs.length) html+=renderCoacheeProgress(recs);
 
-    const sessions=(recs||[]).slice().sort((a,b)=>{
-      const da=new Date(a.recorded_at||a.created_at), db=new Date(b.recorded_at||b.created_at);
-      return tlNewestFirst ? db-da : da-db;
-    });
+    const sessions=(recs||[]).map(s=>({ _type:'sessie', _when:new Date(s.recorded_at||s.created_at), data:s }));
+    const apptItems=(appts||[]).map(a=>({ _type:'afspraak', _when:new Date(a.start_time), data:a }));
+    const combined=[...sessions,...apptItems].sort((a,b)=>tlNewestFirst ? b._when-a._when : a._when-b._when);
 
-    if(!sessions.length){
-      html+=`<div class="empty"><div class="big">Nog geen sessies</div><p>Koppel een opname aan ${esc(c.name.split(' ')[0])} om de tijdlijn te vullen.</p></div>`;
+    if(!combined.length){
+      html+=`<div class="empty"><div class="big">Nog geen sessies</div><p>Koppel een opname aan ${esc(c.name.split(' ')[0])} of plan een meeting om de tijdlijn te vullen.</p></div>`;
       $('coTimelineView').innerHTML=html; return;
     }
 
-    html+=`<div class="tl-sub">${sessions.length} sessie${sessions.length===1?'':'s'} \u00b7 de rode draad van jullie traject</div><div class="timeline">`;
-    sessions.forEach(s=>{
-      const when=new Date(s.recorded_at||s.created_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
+    const sessieCount=sessions.length, apptCount=apptItems.length;
+    const countLabel=[sessieCount?`${sessieCount} sessie${sessieCount===1?'':'s'}`:null, apptCount?`${apptCount} afspraak${apptCount===1?'':'raken'}`:null].filter(Boolean).join(' \u00b7 ');
+    html+=`<div class="tl-sub">${countLabel} \u00b7 de rode draad van jullie traject</div><div class="timeline">`;
+    combined.forEach(item=>{
+      const when=item._when.toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
+      if(item._type==='afspraak'){
+        const a=item.data;
+        const tijd=item._when.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+        const isPast=item._when<new Date();
+        let inner=`<div class="card-title">\u{1F4C5} ${esc(a.title||'Afspraak')} <span class="pill note" style="text-transform:none;margin-left:6px;">${isPast?'geweest':'gepland'} \u00b7 ${tijd}</span></div>`;
+        if(a.meet_link) inner+=`<p style="margin:6px 0;"><a href="${esc(a.meet_link)}" target="_blank" style="color:var(--blue);">\u{1F4F9} Meet-link openen \u2197</a></p>`;
+        inner+=`<div class="section-label" style="margin-top:8px;"><span>Aantekeningen</span></div><textarea placeholder="Waar ging het over, wat viel op\u2026 Dain leest dit mee." onblur="saveApptNotes('${a.id}',this.value)" style="min-height:70px;">${esc(a.notes||'')}</textarea>`;
+        html+=`<div class="tl-item"><div class="tl-dot"></div><div class="tl-date">${when}</div><div class="tl-card">${inner}</div></div>`;
+        return;
+      }
+      const s=item.data;
       const secRows=(s.summaries||[]).filter(x=>x.kind==='section').sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));
       const summary=(s.summaries||[]).find(x=>x.kind==='summary')?.content;
       const insights=(s.summaries||[]).find(x=>x.kind==='coaching_insights')?.content;
