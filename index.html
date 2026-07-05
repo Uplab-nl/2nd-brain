@@ -255,6 +255,15 @@
   .tl-notes textarea { width:100%; border:1.5px solid var(--line); border-radius:11px; padding:10px 12px; font-family:inherit; font-size:14px; color:var(--ink-soft); resize:vertical; min-height:70px; margin-top:6px; }
   .tl-notes textarea:focus { outline:none; border-color:var(--purple); box-shadow:0 0 0 3px rgba(138,92,255,.14); }
   .note-thumb { width:40px; height:40px; border-radius:8px; object-fit:cover; flex-shrink:0; }
+  .rename-btn { background:none; border:none; cursor:pointer; font-size:13px; color:var(--ink-faint); padding:0 2px; vertical-align:middle; }
+  .rename-btn:hover { color:var(--purple); }
+  .note-inline-title { width:100%; border:none; border-bottom:1.5px solid transparent; padding:2px 0 8px; font-family:inherit; font-size:16px; font-weight:600; color:var(--ink); background:none; margin-bottom:4px; }
+  .note-inline-title:focus { outline:none; border-bottom-color:var(--purple); }
+  .note-inline-content { width:100%; border:1.5px solid var(--line); border-radius:11px; padding:10px 12px; font-family:inherit; font-size:14.5px; color:var(--ink-soft); line-height:1.6; margin-bottom:4px; min-height:100px; white-space:pre-wrap; word-break:break-word; }
+  .note-inline-content:focus { outline:none; border-color:var(--purple); box-shadow:0 0 0 3px rgba(138,92,255,.14); }
+  .note-inline-content:empty:before { content:attr(data-placeholder); color:var(--ink-faint); }
+  .note-inline-img { max-width:100%; border-radius:10px; display:block; margin:8px 0; cursor:default; }
+  .img-uploading { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-faint); background:var(--bg); border:1px dashed var(--line); border-radius:8px; padding:6px 10px; margin:4px 0; }
   .att-item { position:relative; margin:10px 0; }
   .att-item img, .att-item video { max-width:100%; border-radius:10px; display:block; }
   .att-del { position:absolute; top:6px; right:6px; background:rgba(20,20,20,.6); color:#fff; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; font-size:12px; line-height:1; }
@@ -574,7 +583,7 @@
     <div id="paneNote" class="hidden">
       <div class="note-composer">
         <input type="text" class="note-title" id="noteTitle" placeholder="Titel van je notitie">
-        <textarea id="noteBody" placeholder="Schrijf hier je gedachte&hellip;"></textarea>
+        <div id="noteBody" class="note-inline-content" contenteditable="true" data-placeholder="Schrijf hier je gedachte&hellip; (plak gerust een afbeelding)"></div>
         <div class="nc-foot">
           <select id="noteNotebook"><option value="">Geen notitieboek</option></select>
           <div style="display:flex;align-items:center;gap:10px;"><span class="save-status" id="noteStatus"></span><button class="mic-btn" id="micBtn" title="Dicteer je notitie (Nederlands)">&#127897;</button><button class="upload-btn" id="noteSaveBtn" onclick="saveNoteAndNew()">Bewaar &amp; nieuw</button></div>
@@ -1228,7 +1237,7 @@
       <div class="card-head">
         <div style="display:flex;align-items:flex-start;gap:12px;flex:1;">
           ${playBtn}
-          <div><div class="card-title">${esc(r.title||'Naamloze opname')}</div><div class="card-meta">${when} \u00b7 ${esc(r.source)} ${nb2} ${coTag} ${tplTag} ${bkTag}</div></div>
+          <div><div class="card-title">${esc(r.title||'Naamloze opname')} <button class="rename-btn" onclick="event.stopPropagation();renameRecording('${r.id}','${escJs(r.title||'')}')" title="Titel wijzigen">\u270E</button>${r.title_is_auto?`<span class="tpl-tag" style="margin-left:4px;" title="Dain past deze titel automatisch aan zodra hij opnieuw analyseert \u2014 totdat je 'm zelf wijzigt">\u2728 auto-titel</span>`:''}</div><div class="card-meta">${when} \u00b7 ${esc(r.source)} ${nb2} ${coTag} ${tplTag} ${bkTag}</div></div>
         </div>
         ${starHTML('recordings',r.id,r.favorite)}
         <span class="pill ${r.status}">${pillLabel[r.status]||r.status}</span>
@@ -1248,7 +1257,6 @@
     const nbTag=nb?`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`:'';
     const co=coachees.find(c=>c.id===n.coachee_id);
     const coTag=co?`<span class="co-tag">\u{1F464} ${esc(co.name)}</span>`:'';
-    const t=esc(n.title||''), c=esc(n.content||'');
     const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,id)=>id===n.notebook_id?`value="${id}" selected`:m);
     const nbPick=`<select onchange="setNoteNotebook('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select>`;
     const coachOpts=`<option value="">\u2014 koppel coachee \u2014</option>`+coachees.map(cc=>`<option value="${cc.id}" ${cc.id===n.coachee_id?'selected':''}>${esc(cc.name)}</option>`).join('');
@@ -1257,12 +1265,20 @@
     const prev=preview2(n.content||'');
     const thumb=atts.find(a=>a.kind==='image');
     const thumbHTML=thumb?`<img src="${thumb.url}" class="note-thumb" alt="">`:'';
+    const inlineIds=new Set([...(n.content||'').matchAll(/\[\[img:([a-zA-Z0-9-]+)\]\]/g)].map(m=>m[1]));
+    const looseAtts=atts.filter(a=>!inlineIds.has(a.id));
+    const delBtn=`<button class="act danger" onclick="event.stopPropagation();askDeleteNote('${n.id}',this)" title="Verwijderen">\u{1F5D1}</button>`;
     return `<article class="card collapsible" id="note-${n.id}" onclick="toggleCard(this)">
-      <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(n.title||'Naamloze notitie')}</div><div class="card-meta">${when} ${nbTag} ${coTag}</div></div>${thumbHTML}${starHTML('notes',n.id,n.favorite)}<span class="pill note">notitie</span><span class="card-caret">\u25B6</span></div>
+      <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(n.title||'Naamloze notitie')}</div><div class="card-meta">${when} ${nbTag} ${coTag}</div></div>${thumbHTML}${starHTML('notes',n.id,n.favorite)}${delBtn}<span class="pill note">notitie</span><span class="card-caret">\u25B6</span></div>
       ${prev?`<div class="card-preview">${prev}</div>`:''}
-      <div class="card-body" onclick="event.stopPropagation()"><div class="text-block">${linkifyWiki(n.content)}</div>${attachmentsBlockHTML(atts)}<div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${nbPick} ${coachPick} ${bkPick}</div></div>
+      <div class="card-body" onclick="event.stopPropagation()">
+        <input type="text" class="note-inline-title" id="ninlt-${n.id}" value="${esc(n.title||'')}" placeholder="Titel" oninput="scheduleNoteSave('${n.id}')">
+        <div class="note-inline-content" id="ninlc-${n.id}" contenteditable="true" data-placeholder="Schrijf hier je gedachte\u2026 (plak gerust een afbeelding)" oninput="scheduleNoteSave('${n.id}')" onpaste="handleNotePaste(event,'${n.id}')">${renderNoteContentHTML(n.content,atts)}</div>
+        <span class="save-status" id="nstat-${n.id}"></span>
+        <div id="noteatt-${n.id}">${attachmentsBlockHTML(looseAtts)}</div>
+        <div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${nbPick} ${coachPick} ${bkPick}</div>
+      </div>
       <div class="card-actions" onclick="event.stopPropagation()">
-        <button class="act" onclick="editNote('${n.id}',this)" data-title="${t}" data-content="${c}">Bewerken</button>
         <button class="act" onclick="pickAttachment('note','${n.id}')">\u{1F4CE} Bijlage</button>
         <button class="act danger" onclick="askDeleteNote('${n.id}',this)">\u{1F5D1} Verwijderen</button>
       </div></article>`;
@@ -1271,7 +1287,7 @@
   function mapCardHTML(m){
     const when=new Date(m.updated_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
     const bkPick=`<select onchange="event.stopPropagation();setMapBucket('${m.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${mmBucketOptions(m.bucket_id)}</select>`;
-    return `<article class="card"><div class="card-head"><div style="flex:1;cursor:pointer;" onclick="openMap('${m.id}','${escJs(m.title)}')"><div class="card-title">${esc(m.title)}</div><div class="card-meta">Laatst bewerkt ${when}</div></div>${starHTML('mindmaps',m.id,m.favorite)}<span class="pill summarized">mindmap</span></div>
+    return `<article class="card open"><div class="card-head"><div style="flex:1;cursor:pointer;" onclick="openMap('${m.id}','${escJs(m.title)}')"><div class="card-title">${esc(m.title)}</div><div class="card-meta">Laatst bewerkt ${when}</div></div>${starHTML('mindmaps',m.id,m.favorite)}<span class="pill summarized">mindmap</span></div>
       <div class="card-actions" onclick="event.stopPropagation()">${bkPick}<button class="act primary" onclick="openMap('${m.id}','${escJs(m.title)}')">Openen</button><button class="act danger" onclick="askDeleteMindmap('${m.id}',this)">\u{1F5D1} Verwijderen</button></div></article>`;
   }
 
@@ -1285,7 +1301,7 @@
 
   async function loadRecordings(){
     renderRecBucketBar();
-    let q=sb.from('recordings').select('id, title, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)').neq('status','deleted').order('created_at',{ascending:false});
+    let q=sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)').neq('status','deleted').order('created_at',{ascending:false});
     if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
     if(activeRecBucket!=='all') q=q.eq('bucket_id',activeRecBucket);
     const { data:recs, error }=await q;
@@ -1324,7 +1340,7 @@
     if(!templates.length) await loadTemplateList();
     if(!inspBuckets.length) await loadBuckets();
     const [recs,notes,maps,books,coach,insp,docs]=await Promise.all([
-      sb.from('recordings').select('id, title, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)').eq('favorite',true).neq('status','deleted').order('created_at',{ascending:false}),
+      sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)').eq('favorite',true).neq('status','deleted').order('created_at',{ascending:false}),
       sb.from('notes').select('*').eq('favorite',true).is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false}),
       sb.from('mindmaps').select('*').eq('favorite',true).neq('status','deleted').order('updated_at',{ascending:false}),
       sb.from('book_summaries').select('*').eq('favorite',true).order('created_at',{ascending:false}),
@@ -1379,32 +1395,37 @@
   }
 
   const editTimers={};
-  function editNote(id,btn){
-    const card=document.getElementById('note-'+id);
-    const title=btn.getAttribute('data-title'), content=btn.getAttribute('data-content');
-    card.querySelector('.card-body').innerHTML=
-      `<input type="text" id="et-${id}" style="width:100%;border:1.5px solid var(--line);border-radius:9px;padding:9px 12px;font-family:inherit;font-size:16px;font-weight:500;margin-bottom:8px;" placeholder="Titel">
-       <textarea id="ec-${id}" style="width:100%;border:1.5px solid var(--line);border-radius:9px;padding:10px 12px;font-family:inherit;font-size:14.5px;color:var(--ink-soft);resize:vertical;min-height:90px;line-height:1.6;" placeholder="Inhoud"></textarea>`;
-    const ti=document.getElementById('et-'+id), ci=document.getElementById('ec-'+id);
-    ti.value=title; ci.value=content;
-    card.querySelector('.card-actions').innerHTML=
-      `<span class="save-status" id="es-${id}"></span>
-       <button class="act" onclick="load()" style="margin-left:auto;">Klaar</button>`;
-    const st=document.getElementById('es-'+id);
-    function sched(){
-      st.className='save-status saving'; st.textContent='Opslaan\u2026';
-      clearTimeout(editTimers[id]);
-      editTimers[id]=setTimeout(async()=>{
-        const c=ci.value.trim();
-        if(!c){ st.className='save-status'; st.textContent='Notitie mag niet leeg zijn'; return; }
-        const { error }=await sb.from('notes').update({ title:ti.value.trim()||null, content:c }).eq('id',id);
-        st.className='save-status saved'; st.textContent=error?'':'Opgeslagen \u2713';
-        if(!error){ embedContent('notes',id); loadNotesIndex(); }
-      },900);
+  // Direct bewerkbaar: titel + inhoud slaan zichzelf gedebouncet op, geen 'Bewerken'-klik meer nodig
+  function scheduleNoteSave(id){
+    const ti=document.getElementById('ninlt-'+id), ci=document.getElementById('ninlc-'+id);
+    if(!ti||!ci) return;
+    const st=document.getElementById('nstat-'+id);
+    if(st){ st.className='save-status saving'; st.textContent='Opslaan\u2026'; }
+    clearTimeout(editTimers[id]);
+    editTimers[id]=setTimeout(async()=>{
+      const c=serializeNoteContent(ci).trim();
+      if(!c){ if(st){ st.className='save-status'; st.textContent='Notitie mag niet leeg zijn'; } return; }
+      const { error }=await sb.from('notes').update({ title:ti.value.trim()||null, content:c }).eq('id',id);
+      if(st){ st.className='save-status saved'; st.textContent=error?'':'Opgeslagen \u2713'; }
+      if(!error){ embedContent('notes',id); loadNotesIndex(); }
+    },900);
+  }
+  // Plak een afbeelding rechtstreeks tussen de tekst: verschijnt meteen op de cursorpositie, tekst plakt gewoon als platte tekst
+  function handleNotePaste(event,id){
+    const cd=event.clipboardData||window.clipboardData; const items=cd?.items;
+    if(items){
+      for(const item of items){
+        if(item.type && item.type.startsWith('image/')){
+          event.preventDefault();
+          const file=item.getAsFile();
+          if(file) insertImageAtCursor(id,file,()=>scheduleNoteSave(id));
+          return;
+        }
+      }
     }
-    ti.addEventListener('input',sched);
-    ci.addEventListener('input',sched);
-    ti.focus();
+    event.preventDefault();
+    document.execCommand('insertText',false,cd.getData('text/plain'));
+    scheduleNoteSave(id);
   }
 
   // ---- Save note ----
@@ -1415,9 +1436,9 @@
     noteStatus.className='save-status'+(state==='saving'?' saving':state==='saved'?' saved':'');
     noteStatus.textContent=state==='saving'?'Opslaan\u2026':state==='saved'?'Opgeslagen \u2713':'';
   }
-  async function autoSaveComposer(){
-    const title=$('noteTitle').value.trim(), content=$('noteBody').value.trim();
-    if(!content && !title){ return; } // niks om op te slaan
+  async function autoSaveComposer(force){
+    const title=$('noteTitle').value.trim(), content=serializeNoteContent($('noteBody')).trim();
+    if(!content && !title && !force){ return; } // niks om op te slaan
     setStatus('saving');
     const { data:{ user } }=await sb.auth.getUser();
     if(!composerNoteId){
@@ -1438,11 +1459,31 @@
     clearTimeout(composerTimer);
     composerTimer=setTimeout(autoSaveComposer,900);
   }
+  // Plak een afbeelding in een gloednieuwe notitie: maak zo nodig meteen een concept aan zodat de bijlage ergens bij hoort
+  async function handleComposerPaste(event){
+    const cd=event.clipboardData||window.clipboardData; const items=cd?.items;
+    if(items){
+      for(const item of items){
+        if(item.type && item.type.startsWith('image/')){
+          event.preventDefault();
+          const file=item.getAsFile(); if(!file) return;
+          if(!composerNoteId) await autoSaveComposer(true);
+          if(!composerNoteId) return;
+          insertImageAtCursor(composerNoteId,file,scheduleAutoSave);
+          return;
+        }
+      }
+    }
+    event.preventDefault();
+    document.execCommand('insertText',false,cd.getData('text/plain'));
+    scheduleAutoSave();
+  }
   $('noteTitle').addEventListener('input',scheduleAutoSave);
   $('noteBody').addEventListener('input',scheduleAutoSave);
+  $('noteBody').addEventListener('paste',handleComposerPaste);
   $('noteNotebook').addEventListener('change',()=>{ if(composerNoteId) autoSaveComposer(); });
   // Als je naar de feed wilt: composer leegmaken en klaarzetten voor een nieuwe notitie
-  function resetComposer(){ $('noteTitle').value=''; $('noteBody').value=''; composerNoteId=null; setStatus(''); }
+  function resetComposer(){ $('noteTitle').value=''; $('noteBody').innerHTML=''; composerNoteId=null; setStatus(''); }
 
   // ---- Opname-buckets (mappen) ----
   let recBuckets=[], activeRecBucket='all';
@@ -1578,6 +1619,57 @@
     if(upErr){ alert('Upload mislukt: '+upErr.message); return; }
     const { error:dbErr }=await sb.from('attachments').insert({ user_id:user.id, owner_type:ownerType, owner_id:ownerId, file_path:path, file_name:file.name, mime_type:file.type, kind });
     if(dbErr){ alert('Kon bijlage niet opslaan: '+dbErr.message); }
+  }
+  // Zelfde als hierboven, maar geeft de nieuwe rij + tijdelijke link terug \u2014 nodig om 'm meteen inline te tonen
+  async function uploadAttachmentFileReturning(ownerType,ownerId,file){
+    const { data:{ user } }=await sb.auth.getUser();
+    const kind=attachmentKind(file);
+    const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path=`${ownerType}/${ownerId}/${Date.now()}_${safeName}`;
+    const { error:upErr }=await sb.storage.from('Attachments').upload(path,file);
+    if(upErr){ alert('Upload mislukt: '+upErr.message); return null; }
+    const { data:row, error:dbErr }=await sb.from('attachments').insert({ user_id:user.id, owner_type:ownerType, owner_id:ownerId, file_path:path, file_name:file.name, mime_type:file.type, kind }).select().single();
+    if(dbErr||!row){ alert('Kon bijlage niet opslaan: '+(dbErr?.message||'')); return null; }
+    const { data:signed }=await sb.storage.from('Attachments').createSignedUrl(path,3600);
+    return { ...row, url:signed?.signedUrl||'' };
+  }
+  // ---- Rich content voor notities: platte tekst met [[img:ID]]-tokens op de plek waar een afbeelding hoort ----
+  function renderNoteContentHTML(content,atts){
+    const attById={}; (atts||[]).forEach(a=>{ attById[a.id]=a; });
+    return esc(content||'').replace(/\[\[img:([a-zA-Z0-9-]+)\]\]/g,(m,attId)=>{
+      const a=attById[attId];
+      if(a && a.kind==='image') return `<img src="${a.url}" class="note-inline-img" data-att-id="${attId}" contenteditable="false" alt="">`;
+      return ''; // bijlage inmiddels verwijderd \u2014 gewoon laten verdwijnen
+    });
+  }
+  function serializeNoteContent(el){
+    let out='';
+    function walk(node){
+      if(node.nodeType===3){ out+=node.textContent; return; }
+      if(node.nodeType!==1) return;
+      if(node.tagName==='BR'){ out+='\n'; return; }
+      if(node.tagName==='IMG' && node.classList.contains('note-inline-img')){ out+=`[[img:${node.getAttribute('data-att-id')}]]`; return; }
+      if(node.classList && node.classList.contains('img-uploading')) return; // nog bezig, niet meesturen
+      const isBlock=(node.tagName==='DIV'||node.tagName==='P');
+      if(isBlock && out.length && !out.endsWith('\n')) out+='\n';
+      node.childNodes.forEach(walk);
+      if(isBlock && !out.endsWith('\n')) out+='\n';
+    }
+    el.childNodes.forEach(walk);
+    return out.replace(/\n{3,}/g,'\n\n').replace(/^\n+|\n+$/g,'');
+  }
+  // Voeg een geplakte afbeelding meteen op de cursorpositie in, en vervang 'm door de echte afbeelding zodra de upload klaar is
+  async function insertImageAtCursor(noteId,file,onDone){
+    const tempId='imgph-'+Date.now()+Math.random().toString(36).slice(2,7);
+    document.execCommand('insertHTML',false,`<span id="${tempId}" class="img-uploading" contenteditable="false">\u23F3 afbeelding uploaden\u2026</span>`);
+    const att=await uploadAttachmentFileReturning('note',noteId,file);
+    const ph=document.getElementById(tempId);
+    if(att && ph){
+      const img=document.createElement('img');
+      img.src=att.url; img.className='note-inline-img'; img.setAttribute('data-att-id',att.id); img.setAttribute('contenteditable','false'); img.alt='';
+      ph.replaceWith(img);
+    } else if(ph){ ph.remove(); }
+    if(onDone) onDone();
   }
   async function deleteAttachment(id,path,ownerType){
     if(!confirm('Deze bijlage verwijderen?')) return;
@@ -1913,8 +2005,8 @@
     $('mapCards').innerHTML=maps.map(m=>{
       const when=new Date(m.updated_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
       const bkPick=`<select onchange="event.stopPropagation();setMapBucket('${m.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${mmBucketOptions(m.bucket_id)}</select>`;
-      return `<article class="card" style="cursor:pointer;" onclick="openMap('${m.id}','${escJs(m.title)}')">
-        <div class="card-head"><div><div class="card-title">${esc(m.title)}</div><div class="card-meta">Laatst bewerkt ${when}</div></div>${starHTML('mindmaps',m.id,m.favorite)}<span class="pill summarized">mindmap</span></div>
+      return `<article class="card open" style="cursor:pointer;" onclick="openMap('${m.id}','${escJs(m.title)}')">
+        <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(m.title)}</div><div class="card-meta">Laatst bewerkt ${when}</div></div>${starHTML('mindmaps',m.id,m.favorite)}<span class="pill summarized">mindmap</span></div>
         <div class="card-actions" onclick="event.stopPropagation()">${bkPick}<button class="act danger" style="margin-left:auto;" onclick="askDeleteMindmap('${m.id}',this)">\u{1F5D1} Verwijderen</button></div>
       </article>`;
     }).join('');
@@ -2523,7 +2615,7 @@
       if(t.trigger_hint) body+=`<div class="section-label"><span>Past wanneer</span></div><div class="text-block">${esc(t.trigger_hint)}</div>`;
       if(secs.length) body+=`<div class="section-label"><span>Vaste kopjes</span></div><div>${secHtml}</div>`;
       if(t.instruction) body+=`<div class="section-label"><span>Instructie aan Dain</span></div><div class="text-block">${esc(t.instruction)}</div>`;
-      return `<article class="card">
+      return `<article class="card open">
         <div class="card-head"><div><div class="card-title">${esc(t.name)}</div><div class="card-meta">Template</div></div><span class="tpl-tag">\u25A4 sjabloon</span></div>
         <div class="card-body">${body}</div>
         <div class="card-actions"><button class="act danger" onclick="delTemplate('${t.id}',this)">Verwijderen</button></div>
@@ -3284,6 +3376,13 @@
     }
   }
   
+  async function renameRecording(id,current){
+    const name=await promptModal('Titel van de opname', current, { okLabel:'Opslaan' }); if(name===null) return;
+    const title=name.trim(); if(!title) return;
+    const { error }=await sb.from('recordings').update({ title, title_is_auto:false }).eq('id',id);
+    if(error){ alert('Kon titel niet opslaan: '+error.message); return; }
+    load();
+  }
   async function startTranscribe(id,btn){
     if(!btn) return;
     btn.disabled=true;
@@ -3410,7 +3509,8 @@
       for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) t+=e.results[i][0].transcript; }
       if(t){
         const b=$('noteBody');
-        b.value=(b.value?b.value.replace(/\s+$/,'')+' ':'')+t.trim();
+        const needsSpace=b.textContent && !/\s$/.test(b.textContent);
+        b.appendChild(document.createTextNode((needsSpace?' ':'')+t.trim()));
         b.dispatchEvent(new Event('input'));
       }
     };
