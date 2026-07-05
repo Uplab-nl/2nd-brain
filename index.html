@@ -2198,7 +2198,8 @@
       <label>Titel</label><input type="text" id="mtTitle" value="Coachingsessie met ${esc(c.name)}">
       <label>Wanneer</label><input type="datetime-local" id="mtWhen" value="${def}">
       <label>Duur (minuten)</label><input type="text" id="mtDur" value="60">
-      <label>Notitie voor jezelf (optioneel, Dain leest 'm mee)</label><textarea id="mtNotes" placeholder="Waar wil je het over hebben\u2026"></textarea>
+      <label>Bericht voor ${esc(first)} (optioneel, komt in de mail te staan)</label><textarea id="mtMessage" placeholder="Bijv. een persoonlijke noot of wat je wilt dat ${esc(first)} vooraf weet\u2026"></textarea>
+      <label>Notitie voor jezelf (optioneel, blijft priv\u00e9 \u2014 Dain leest 'm mee)</label><textarea id="mtNotes" placeholder="Waar wil je het over hebben\u2026"></textarea>
       ${!c.email?`<p style="color:var(--ink-faint);font-size:12.5px;">Geen e-mailadres bekend bij ${esc(first)} \u2014 er gaat dan geen mail uit, wel gewoon de agenda-afspraak.</p>`:''}
       <div class="sheet-actions"><button class="act" id="mtCancel">Annuleren</button><button class="act primary" id="mtSave" ${notConnected?'disabled':''}>\u{1F4C5} Zet in agenda</button></div>`;
     openSheet('\u{1F4C5} Meeting plannen', body, (ov,close)=>{
@@ -2210,10 +2211,11 @@
         const dur=parseInt($('mtDur').value)||60;
         const start=new Date(when); const end=new Date(start.getTime()+dur*60000);
         const notes=$('mtNotes').value.trim();
+        const messageToCoachee=$('mtMessage').value.trim();
         btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Bezig\u2026';
         try{
           const { data, error }=await sb.functions.invoke('create-appointment',{ body:{
-            coachee_id:id, title, start_time:start.toISOString(), end_time:end.toISOString(), notes:notes||null
+            coachee_id:id, title, start_time:start.toISOString(), end_time:end.toISOString(), notes:notes||null, message_to_coachee:messageToCoachee||null
           }});
           if(error||data?.error){
             const msg=data?.error||error.message;
@@ -2234,6 +2236,57 @@
   async function saveApptNotes(apptId,text){
     await sb.from('appointments').update({ notes:text.trim()||null, updated_at:new Date().toISOString() }).eq('id',apptId);
     embedContent('appointments',apptId);
+  }
+  async function openRescheduleAppt(apptId){
+    const { data:a, error }=await sb.from('appointments').select('*').eq('id',apptId).single();
+    if(error||!a){ alert('Kon afspraak niet laden.'); return; }
+    const startLocal=new Date(a.start_time); const dur=Math.round((new Date(a.end_time)-startLocal)/60000);
+    const def=new Date(startLocal.getTime()-startLocal.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    const body=`
+      <p style="color:var(--ink-soft);font-size:14px;margin-bottom:6px;">Kies een nieuw moment. De Google Agenda-afspraak wordt bijgewerkt en de coachee krijgt een mailtje met de nieuwe tijd.</p>
+      <label>Titel</label><input type="text" id="rsTitle" value="${esc(a.title||'')}">
+      <label>Nieuwe datum en tijd</label><input type="datetime-local" id="rsWhen" value="${def}">
+      <label>Duur (minuten)</label><input type="text" id="rsDur" value="${dur||60}">
+      <label>Bericht voor de coachee (optioneel, komt in de mail)</label><textarea id="rsMessage" placeholder="Bijv. waarom het verzet is, of gewoon een vriendelijk woordje\u2026"></textarea>
+      <div class="sheet-actions"><button class="act" id="rsCancel">Annuleren</button><button class="act primary" id="rsSave">\u{1F504} Herplannen</button></div>`;
+    openSheet('\u{1F504} Afspraak herplannen', body, (ov,close)=>{
+      $('rsCancel').onclick=close;
+      $('rsSave').onclick=async()=>{
+        const btn=$('rsSave'); const orig=btn.innerHTML;
+        const title=$('rsTitle').value.trim(); if(!title){ alert('Geef de afspraak een titel.'); return; }
+        const when=$('rsWhen').value; if(!when){ alert('Kies een datum en tijd.'); return; }
+        const newDur=parseInt($('rsDur').value)||60;
+        const newStart=new Date(when); const newEnd=new Date(newStart.getTime()+newDur*60000);
+        const messageToCoachee=$('rsMessage').value.trim();
+        btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Bezig\u2026';
+        try{
+          const { data, error }=await sb.functions.invoke('reschedule-appointment',{ body:{
+            appointment_id:apptId, title, start_time:newStart.toISOString(), end_time:newEnd.toISOString(), message_to_coachee:messageToCoachee||null
+          }});
+          if(error||data?.error) throw new Error(data?.error||error.message);
+          close();
+          if(a.coachee_id && !$('coTimelineView').classList.contains('hidden')) openTimeline(a.coachee_id);
+          if(data?.mail_error) alert('Afspraak is verzet, maar de mail ging niet uit: '+data.mail_error);
+        }catch(e){
+          btn.disabled=false; btn.innerHTML=orig;
+          alert('Kon afspraak niet herplannen: '+e.message);
+        }
+      };
+    });
+  }
+  async function cancelAppointment(apptId,title){
+    if(!confirm(`Afspraak "${title}" annuleren? De coachee krijgt hier automatisch een mail van.`)) return;
+    const msg=await promptModal('Bericht bij annulering (optioneel)','',{ placeholder:'Bijv. waarom het niet doorgaat\u2026', okLabel:'Annuleer afspraak' });
+    if(msg===null) return;
+    try{
+      const { data:appt }=await sb.from('appointments').select('coachee_id').eq('id',apptId).maybeSingle();
+      const { data, error }=await sb.functions.invoke('cancel-appointment',{ body:{ appointment_id:apptId, message_to_coachee:msg||null } });
+      if(error||data?.error) throw new Error(data?.error||error.message);
+      if(appt?.coachee_id && !$('coTimelineView').classList.contains('hidden')) openTimeline(appt.coachee_id);
+      if(data?.mail_error) alert('Afspraak is geannuleerd, maar de mail ging niet uit: '+data.mail_error);
+    }catch(e){
+      alert('Kon afspraak niet annuleren: '+e.message);
+    }
   }
 
   function editCoachee(id){
@@ -2415,8 +2468,12 @@
         const a=item.data;
         const tijd=item._when.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
         const isPast=item._when<new Date();
-        let inner=`<div class="card-title">\u{1F4C5} ${esc(a.title||'Afspraak')} <span class="pill note" style="text-transform:none;margin-left:6px;">${isPast?'geweest':'gepland'} \u00b7 ${tijd}</span></div>`;
-        if(a.meet_link) inner+=`<p style="margin:6px 0;"><a href="${esc(a.meet_link)}" target="_blank" style="color:var(--blue);">\u{1F4F9} Meet-link openen \u2197</a></p>`;
+        const isCancelled=a.status==='geannuleerd';
+        const badgeLabel=isCancelled?'geannuleerd':(isPast?'geweest':'gepland');
+        const badgeStyle=isCancelled?'background:#f1f1f1;color:var(--ink-faint);text-decoration:line-through;':'';
+        let inner=`<div class="card-title">\u{1F4C5} ${esc(a.title||'Afspraak')} <span class="pill note" style="text-transform:none;margin-left:6px;${badgeStyle}">${badgeLabel} \u00b7 ${tijd}</span></div>`;
+        if(a.meet_link && !isCancelled) inner+=`<p style="margin:6px 0;"><a href="${esc(a.meet_link)}" target="_blank" style="color:var(--blue);">\u{1F4F9} Meet-link openen \u2197</a></p>`;
+        if(!isCancelled && !isPast) inner+=`<div style="display:flex;gap:8px;margin:8px 0;"><button class="act" onclick="openRescheduleAppt('${a.id}')">\u{1F504} Herplannen</button><button class="act danger" onclick="cancelAppointment('${a.id}','${escJs(a.title||'Afspraak')}')">Annuleren</button></div>`;
         inner+=`<div class="section-label" style="margin-top:8px;"><span>Aantekeningen</span></div><div class="tl-notes"><textarea placeholder="Waar ging het over, wat viel op\u2026 Dain leest dit mee." onblur="saveApptNotes('${a.id}',this.value)">${esc(a.notes||'')}</textarea></div>`;
         html+=`<div class="tl-item"><div class="tl-dot"></div><div class="tl-date">${when}</div><div class="tl-card">${inner}</div></div>`;
         return;
