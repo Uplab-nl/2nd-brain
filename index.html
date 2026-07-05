@@ -15,6 +15,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+<script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js';</script>
 <style>
   :root {
     --ink:#2c2c3a; --ink-soft:#6b6b7b; --ink-faint:#9a9aa8;
@@ -203,7 +205,7 @@
   .db-check { width:19px; height:19px; border-radius:50%; border:2px solid var(--line); flex-shrink:0; cursor:pointer; margin-top:2px; transition:all .15s; position:relative; }
   .db-check:hover { border-color:var(--purple); }
   .db-check.done { background:var(--grad-purple); border-color:transparent; }
-  .db-check.done::after { content:'\u2713'; color:#fff; font-size:12px; position:absolute; left:3px; top:-1px; }
+  .db-check.done::after { content:'\2713'; color:#fff; font-size:12px; position:absolute; left:3px; top:-1px; }
   .db-action.done .db-action-txt { text-decoration:line-through; color:var(--ink-faint); }
   .db-action-due { display:flex; align-items:center; gap:6px; margin-top:5px; flex-wrap:wrap; }
   .db-due-input { font-family:inherit; font-size:11.5px; color:var(--ink-faint); border:1.5px solid var(--line); border-radius:8px; padding:3px 7px; background:#fff; }
@@ -252,6 +254,15 @@
   .co-profile textarea:focus { outline:none; border-color:var(--purple); box-shadow:0 0 0 3px rgba(138,92,255,.14); }
   .tl-notes textarea { width:100%; border:1.5px solid var(--line); border-radius:11px; padding:10px 12px; font-family:inherit; font-size:14px; color:var(--ink-soft); resize:vertical; min-height:70px; margin-top:6px; }
   .tl-notes textarea:focus { outline:none; border-color:var(--purple); box-shadow:0 0 0 3px rgba(138,92,255,.14); }
+  .note-thumb { width:40px; height:40px; border-radius:8px; object-fit:cover; flex-shrink:0; }
+  .att-item { position:relative; margin:10px 0; }
+  .att-item img, .att-item video { max-width:100%; border-radius:10px; display:block; }
+  .att-del { position:absolute; top:6px; right:6px; background:rgba(20,20,20,.6); color:#fff; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; font-size:12px; line-height:1; }
+  .att-del:hover { background:rgba(220,60,60,.85); }
+  .pdf-wrap canvas { max-width:100%; border-radius:10px; border:1px solid var(--line); display:block; margin:0 auto; }
+  .pdf-nav { display:flex; align-items:center; justify-content:center; gap:14px; margin-top:8px; font-size:13px; color:var(--ink-soft); }
+  .pdf-nav button { background:var(--bg); border:1px solid var(--line); border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px; }
+  .pdf-nav button:hover { border-color:var(--purple); color:var(--purple); }
   .tl-head { display:flex; align-items:center; gap:14px; margin-bottom:8px; flex-wrap:wrap; }
   .tl-title { font-size:22px; font-weight:700; letter-spacing:-.02em; }
   .tl-sub { color:var(--ink-soft); font-size:14px; font-weight:300; margin-bottom:20px; }
@@ -569,6 +580,7 @@
           <div style="display:flex;align-items:center;gap:10px;"><span class="save-status" id="noteStatus"></span><button class="mic-btn" id="micBtn" title="Dicteer je notitie (Nederlands)">&#127897;</button><button class="upload-btn" id="noteSaveBtn" onclick="saveNoteAndNew()">Bewaar &amp; nieuw</button></div>
         </div>
       </div>
+      <div class="bucket-bar" id="noteBucketBar"></div>
       <div id="feedNote" class="feed"></div>
     </div>
 
@@ -879,7 +891,7 @@
     if(error){ loginErr.textContent='Inloggen mislukt: controleer je e-mail en wachtwoord.'; loginBtn.disabled=false; loginBtn.textContent='Inloggen'; return; }
     showApp();
   }
-  async function showApp(){ loginScreen.classList.add('hidden'); app.classList.remove('hidden'); await loadNotebooks(); await loadCoacheeList(); await loadTemplateList(); await loadRecBuckets(); await loadNotesIndex(); await loadBuckets(); switchTab('dash'); handleShareTarget(); refreshGoogleStatusUI(); handleGoogleOAuthCallback(); }
+  async function showApp(){ loginScreen.classList.add('hidden'); app.classList.remove('hidden'); await loadNotebooks(); await loadCoacheeList(); await loadTemplateList(); await loadRecBuckets(); await loadNoteBuckets(); await loadNotesIndex(); await loadBuckets(); switchTab('dash'); handleShareTarget(); refreshGoogleStatusUI(); handleGoogleOAuthCallback(); }
   async function doLogout(){ await sb.auth.signOut(); app.classList.add('hidden'); loginScreen.classList.remove('hidden'); loginBtn.disabled=false; loginBtn.textContent='Inloggen'; $('password').value=''; }
   loginBtn.addEventListener('click',doLogin);
   $('password').addEventListener('keydown',e=>{ if(e.key==='Enter')doLogin(); });
@@ -1229,7 +1241,8 @@
     </article>`;
   }
 
-  function noteCardHTML(n){
+  function noteCardHTML(n,atts){
+    atts=atts||[];
     const when=new Date(n.created_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
     const nb=nbById(n.notebook_id);
     const nbTag=nb?`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`:'';
@@ -1240,13 +1253,17 @@
     const nbPick=`<select onchange="setNoteNotebook('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select>`;
     const coachOpts=`<option value="">\u2014 koppel coachee \u2014</option>`+coachees.map(cc=>`<option value="${cc.id}" ${cc.id===n.coachee_id?'selected':''}>${esc(cc.name)}</option>`).join('');
     const coachPick=`<select onchange="setNoteCoachee('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${coachOpts}</select>`;
+    const bkPick=`<select onchange="event.stopPropagation();setNoteBucket('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${noteBucketOptions(n.bucket_id)}</select>`;
     const prev=preview2(n.content||'');
+    const thumb=atts.find(a=>a.kind==='image');
+    const thumbHTML=thumb?`<img src="${thumb.url}" class="note-thumb" alt="">`:'';
     return `<article class="card collapsible" id="note-${n.id}" onclick="toggleCard(this)">
-      <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(n.title||'Naamloze notitie')}</div><div class="card-meta">${when} ${nbTag} ${coTag}</div></div>${starHTML('notes',n.id,n.favorite)}<span class="pill note">notitie</span><span class="card-caret">\u25B6</span></div>
+      <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(n.title||'Naamloze notitie')}</div><div class="card-meta">${when} ${nbTag} ${coTag}</div></div>${thumbHTML}${starHTML('notes',n.id,n.favorite)}<span class="pill note">notitie</span><span class="card-caret">\u25B6</span></div>
       ${prev?`<div class="card-preview">${prev}</div>`:''}
-      <div class="card-body" onclick="event.stopPropagation()"><div class="text-block">${linkifyWiki(n.content)}</div><div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${nbPick} ${coachPick}</div></div>
+      <div class="card-body" onclick="event.stopPropagation()"><div class="text-block">${linkifyWiki(n.content)}</div>${attachmentsBlockHTML(atts)}<div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${nbPick} ${coachPick} ${bkPick}</div></div>
       <div class="card-actions" onclick="event.stopPropagation()">
         <button class="act" onclick="editNote('${n.id}',this)" data-title="${t}" data-content="${c}">Bewerken</button>
+        <button class="act" onclick="pickAttachment('note','${n.id}')">\u{1F4CE} Bijlage</button>
         <button class="act danger" onclick="askDeleteNote('${n.id}',this)">\u{1F5D1} Verwijderen</button>
       </div></article>`;
   }
@@ -1474,6 +1491,143 @@
     await sb.from('recordings').update({ bucket_id:bucketId||null }).eq('id',id);
   }
 
+  // ---- Buckets voor losse notities (zelfde patroon als opnames/inspiratie) ----
+  let noteBuckets=[], activeNoteBucket='all';
+  async function loadNoteBuckets(){
+    const { data }=await sb.from('note_buckets').select('*').order('created_at',{ascending:true});
+    noteBuckets=data||[];
+    renderNoteBucketBar();
+  }
+  function renderNoteBucketBar(){
+    const bar=$('noteBucketBar'); if(!bar) return;
+    let html=`<span class="bucket-chip ${activeNoteBucket==='all'?'on':''}" style="${activeNoteBucket==='all'?'background:var(--grad-purple)':''}" onclick="pickNoteBucket('all')">\u2728 Alles</span>`;
+    noteBuckets.forEach(b=>{
+      const on=activeNoteBucket===b.id;
+      html+=`<span class="bucket-chip ${on?'on':''}" style="${on?'background:'+b.color:''}" onclick="pickNoteBucket('${b.id}')">
+        <span class="bdot" style="background:${on?'#fff':b.color}"></span>${esc(b.name)}
+        <span class="bx" onclick="event.stopPropagation();renameNoteBucket('${b.id}')" title="Hernoem">\u270E</span>
+        <span class="bx" onclick="event.stopPropagation();deleteNoteBucket('${b.id}')" title="Verwijder">\u2715</span>
+      </span>`;
+    });
+    html+=`<button class="bucket-chip bucket-add" onclick="addNoteBucket()">+ Nieuwe bucket</button>`;
+    bar.innerHTML=html;
+  }
+  function pickNoteBucket(id){ activeNoteBucket=id; renderNoteBucketBar(); loadNoteFeed(); }
+  function noteBucketOptions(sel){ return `<option value="">Geen bucket</option>`+noteBuckets.map(b=>`<option value="${b.id}" ${b.id===sel?'selected':''}>${esc(b.name)}</option>`).join(''); }
+  async function addNoteBucket(){
+    const name=await promptModal('Naam van de nieuwe bucket'); if(!name) return;
+    const palette=['#8a5cff','#ff5adb','#ff9f43','#5a9cff','#ff6b5a','#3dd6b0'];
+    const color=palette[noteBuckets.length % palette.length];
+    const { data:{ user } }=await sb.auth.getUser();
+    await sb.from('note_buckets').insert({ user_id:user.id, name:name, color });
+    await loadNoteBuckets();
+  }
+  async function renameNoteBucket(id){
+    const b=noteBuckets.find(x=>x.id===id); if(!b) return;
+    const name=await promptModal('Nieuwe naam', b.name); if(!name) return;
+    await sb.from('note_buckets').update({ name:name }).eq('id',id);
+    await loadNoteBuckets();
+  }
+  async function deleteNoteBucket(id){
+    if(!confirm('Deze bucket verwijderen? De notities erin blijven bestaan (belanden in \u2018Alles\u2019).')) return;
+    await sb.from('note_buckets').delete().eq('id',id);
+    if(activeNoteBucket===id) activeNoteBucket='all';
+    await loadNoteBuckets(); loadNoteFeed();
+  }
+  async function setNoteBucket(id,bucketId){
+    await sb.from('notes').update({ bucket_id:bucketId||null }).eq('id',id);
+  }
+
+  // ================= BIJLAGEN: afbeeldingen, video's, pdf's (notities + inspiratie) =================
+  function attachmentKind(file){
+    if(file.type.startsWith('image/')) return 'image';
+    if(file.type.startsWith('video/')) return 'video';
+    if(file.type==='application/pdf') return 'pdf';
+    return 'other';
+  }
+  async function loadAttachmentsFor(ownerType, ownerIds){
+    if(!ownerIds.length) return {};
+    const { data }=await sb.from('attachments').select('*').eq('owner_type',ownerType).in('owner_id',ownerIds).order('sort_order',{ascending:true}).order('created_at',{ascending:true});
+    const rows=data||[];
+    const paths=rows.map(r=>r.file_path);
+    let urlByPath={};
+    if(paths.length){
+      const { data:signed }=await sb.storage.from('Attachments').createSignedUrls(paths,3600);
+      (signed||[]).forEach(s=>{ if(s?.signedUrl) urlByPath[s.path]=s.signedUrl; });
+    }
+    const grouped={};
+    rows.forEach(r=>{ (grouped[r.owner_id]=grouped[r.owner_id]||[]).push({ ...r, url:urlByPath[r.file_path]||'' }); });
+    return grouped;
+  }
+  function pickAttachment(ownerType,ownerId){
+    const inp=document.createElement('input');
+    inp.type='file'; inp.accept='image/*,video/*,application/pdf'; inp.multiple=true;
+    inp.onchange=async()=>{
+      const files=[...inp.files]; if(!files.length) return;
+      for(const f of files){ await uploadAttachmentFile(ownerType,ownerId,f); }
+      if(ownerType==='note') loadNoteFeed(); else loadInspiration();
+    };
+    inp.click();
+  }
+  async function uploadAttachmentFile(ownerType,ownerId,file){
+    const { data:{ user } }=await sb.auth.getUser();
+    const kind=attachmentKind(file);
+    const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path=`${ownerType}/${ownerId}/${Date.now()}_${safeName}`;
+    const { error:upErr }=await sb.storage.from('Attachments').upload(path,file);
+    if(upErr){ alert('Upload mislukt: '+upErr.message); return; }
+    const { error:dbErr }=await sb.from('attachments').insert({ user_id:user.id, owner_type:ownerType, owner_id:ownerId, file_path:path, file_name:file.name, mime_type:file.type, kind });
+    if(dbErr){ alert('Kon bijlage niet opslaan: '+dbErr.message); }
+  }
+  async function deleteAttachment(id,path,ownerType){
+    if(!confirm('Deze bijlage verwijderen?')) return;
+    await sb.storage.from('Attachments').remove([path]);
+    await sb.from('attachments').delete().eq('id',id);
+    if(ownerType==='note') loadNoteFeed(); else loadInspiration();
+  }
+  function attachmentHTML(a){
+    const delBtn=`<button class="att-del" onclick="event.stopPropagation();deleteAttachment('${a.id}','${escJs(a.file_path)}','${a.owner_type}')" title="Verwijderen">\u2715</button>`;
+    if(a.kind==='image') return `<div class="att-item"><img src="${a.url}" alt="">${delBtn}</div>`;
+    if(a.kind==='video') return `<div class="att-item"><video controls><source src="${a.url}"></video>${delBtn}</div>`;
+    if(a.kind==='pdf') return `<div class="att-item pdf-wrap" id="pdfwrap-${a.id}" data-url="${esc(a.url)}">
+        <canvas id="pdfcanvas-${a.id}"></canvas>
+        <div class="pdf-nav"><button onclick="event.stopPropagation();pdfNav('${a.id}',-1)">\u2039</button><span id="pdfpage-${a.id}">\u2026</span><button onclick="event.stopPropagation();pdfNav('${a.id}',1)">\u203a</button></div>
+        ${delBtn}
+      </div>`;
+    return `<div class="att-item"><a href="${a.url}" target="_blank" rel="noopener">\u{1F4CE} ${esc(a.file_name||'Bestand')}</a>${delBtn}</div>`;
+  }
+  function attachmentsBlockHTML(atts){
+    if(!atts||!atts.length) return '';
+    return `<div class="section-label"><span>Bijlagen</span></div>`+atts.map(attachmentHTML).join('');
+  }
+  const pdfState={};
+  function initPendingPdfViewers(){
+    if(!window.pdfjsLib) return;
+    document.querySelectorAll('.pdf-wrap').forEach(el=>{
+      const id=el.id.replace('pdfwrap-','');
+      if(pdfState[id] || !el.dataset.url) return;
+      pdfState[id]={ page:1 };
+      pdfjsLib.getDocument(el.dataset.url).promise.then(doc=>{
+        pdfState[id].doc=doc; pdfState[id].numPages=doc.numPages;
+        renderPdfPage(id);
+      }).catch(()=>{ el.innerHTML='<p style="color:var(--ink-faint);font-size:13px;">Kon PDF niet laden.</p>'; });
+    });
+  }
+  async function renderPdfPage(id){
+    const st=pdfState[id]; if(!st||!st.doc) return;
+    const page=await st.doc.getPage(st.page);
+    const canvas=document.getElementById('pdfcanvas-'+id); if(!canvas) return;
+    const viewport=page.getViewport({ scale:1.3 });
+    canvas.width=viewport.width; canvas.height=viewport.height;
+    await page.render({ canvasContext:canvas.getContext('2d'), viewport }).promise;
+    const lbl=document.getElementById('pdfpage-'+id); if(lbl) lbl.textContent=st.page+' / '+st.numPages;
+  }
+  function pdfNav(id,dir){
+    const st=pdfState[id]; if(!st||!st.doc) return;
+    const next=st.page+dir; if(next<1||next>st.numPages) return;
+    st.page=next; renderPdfPage(id);
+  }
+
   // ---- Upload (drag&drop rechtstreeks op het tabblad, of via de popup) ----
   const uploadZone=$('uploadZone'), upProgress=$('upProgress');
   async function uploadFiles(files, opts){
@@ -1544,6 +1698,7 @@
     input.focus();
   }
   async function deleteCustomTerm(id){
+    if(!confirm('Deze term uit je woordenlijst verwijderen?')) return;
     await sb.from('custom_terms').delete().eq('id',id);
     await loadCustomTermsForPopup();
   }
@@ -2829,7 +2984,7 @@
   // embeddings (afgeleide zoekindex, is zo weer opgebouwd via 'Herindexeer').
   const BACKUP_TABLES=['notebooks','recordings','transcripts','summaries','action_items','notes',
     'coachees','recording_coachees','mindmaps','mindmap_nodes','book_summaries','templates','documents',
-    'inspiration','inspiration_buckets','mindmap_buckets','recording_buckets'];
+    'inspiration','inspiration_buckets','mindmap_buckets','recording_buckets','note_buckets','appointments','attachments'];
   async function exportBackup(btn){
     const original=btn.innerHTML; btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Verzamelen\u2026';
     try{
@@ -2967,9 +3122,9 @@
       </div>`;
     }
     else if(id==='actions'){
-      const open=dashData.actions.filter(a=>!a.done).slice(0,6);
-      const rows=open.length?open.map(a=>actionRowHTML(a)).join(''):'<div class="db-empty">Geen openstaande acties \u2014 lekker bezig \u2728</div>';
-      inner=`<div class="db-title">Openstaande acties</div>${rows}`;
+      const sorted=sortActions(dashData.actions).slice(0,8);
+      const rows=sorted.length?sorted.map(a=>actionRowHTML(a)).join(''):'<div class="db-empty">Geen acties \u2014 lekker bezig \u2728</div>';
+      inner=`<div class="db-title">Acties</div>${rows}`;
     }
     else if(id==='duesoon'){
       const in7=new Date(); in7.setDate(in7.getDate()+7); in7.setHours(23,59,59,999);
@@ -3007,11 +3162,22 @@
   function dashGo(i){ const it=dashData._recentItems?.[i]; if(it&&it.go) it.go(); }
   function dashFav(i){ const it=dashData._favItems?.[i]; if(it&&it.go) it.go(); }
 
+  function sortActions(items){
+    return items.slice().sort((a,b)=>{
+      if(!!a.done!==!!b.done) return a.done?1:-1; // afgevinkt altijd onderaan
+      if(a.done) return new Date(b.created_at)-new Date(a.created_at); // onderling: nieuwst afgevinkt bovenaan binnen dat blok
+      const ad=a.due_date?new Date(a.due_date):null, bd=b.due_date?new Date(b.due_date):null;
+      if(ad && bd) return ad-bd; // eerst vervallende datum bovenaan
+      if(ad && !bd) return -1; // met datum gaat voor zonder datum
+      if(!ad && bd) return 1;
+      return new Date(a.created_at)-new Date(b.created_at); // beide zonder datum: oudste eerst
+    });
+  }
   async function toggleAction(id){
     const a=dashData.actions.find(x=>x.id===id); if(!a) return;
     a.done=!a.done;
-    const el=$('da-'+id); if(el){ el.classList.toggle('done',a.done); el.querySelector('.db-check').classList.toggle('done',a.done); }
     await sb.from('action_items').update({ done:a.done }).eq('id',id);
+    renderDash(); // her-sorteert zodat afgevinkte taken naar onderen zakken
   }
   function dueBadge(dueStr){
     if(!dueStr) return '';
@@ -3025,7 +3191,7 @@
     return `<span class="due-badge later">${label}</span>`;
   }
   function actionRowHTML(a){
-    return `<div class="db-action" id="da-${a.id}">
+    return `<div class="db-action ${a.done?'done':''}" id="da-${a.id}">
       <div class="db-check ${a.done?'done':''}" onclick="toggleAction('${a.id}')"></div>
       <div style="flex:1;">
         <div class="db-action-txt">${esc(a.content)}</div>
@@ -3585,6 +3751,7 @@
     inspItems=items;
     conn.textContent=`\u25CF ${items.length} vonk${items.length===1?'':'en'}`;
     if(!items.length){ grid.innerHTML=`<div class="empty"><div class="big">Nog leeg</div><p>${activeBucket==='all'?'Plak een link, sleep een screenshot of upload een foto om te beginnen.':'Deze bucket is nog leeg. Koppel er vonken aan via het potloodje op een kaart.'}</p></div>`; return; }
+    const attByInsp=await loadAttachmentsFor('inspiration',items.map(i=>i.id));
     const cards=await Promise.all(items.map(async i=>{
       let media='';
       if(i.kind==='image' && i.image_path){
@@ -3600,10 +3767,12 @@
       if(i.url && i.kind!=='video') bodyInner+=`<a class="ic-link" href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.url)}</a>`;
       const bk=inspBuckets.find(x=>x.id===i.bucket_id);
       if(bk) bodyInner+=`<span class="ic-bucket" style="background:${bk.color}">${esc(bk.name)}</span>`;
+      bodyInner+=attachmentsBlockHTML(attByInsp[i.id]);
       const bodyBlock=bodyInner?`<div class="ic-body">${bodyInner}</div>`:'';
       return `<div class="insp-card">
         <div class="ic-tools">
           <button class="${i.favorite?'fav-on':''}" title="Favoriet" onclick="toggleInspFav('${i.id}',this)">${i.favorite?'\u2605':'\u2606'}</button>
+          <button title="Bijlage toevoegen" onclick="pickAttachment('inspiration','${i.id}')">\u{1F4CE}</button>
           <button title="Bewerken" onclick="editInsp('${i.id}')">\u270E</button>
           <button title="Verwijderen" onclick="delInsp('${i.id}','${i.image_path||''}')">\u{1F5D1}</button>
         </div>
@@ -3611,6 +3780,7 @@
       </div>`;
     }));
     grid.innerHTML=cards.join('');
+    initPendingPdfViewers();
   }
 
   function openInspLink(){
@@ -3746,10 +3916,14 @@
   }
   async function loadNoteFeed(){
     const fn=$('feedNote'); if(!fn) return;
+    if(!noteBuckets.length) await loadNoteBuckets(); else renderNoteBucketBar();
     let q=sb.from('notes').select('*').is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false});
     if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
+    if(activeNoteBucket!=='all') q=q.eq('bucket_id',activeNoteBucket);
     const { data:notes }=await q;
-    fn.innerHTML=(notes||[]).map(noteCardHTML).join('');
+    const attByNote=await loadAttachmentsFor('note',(notes||[]).map(n=>n.id));
+    fn.innerHTML=(notes||[]).map(n=>noteCardHTML(n,attByNote[n.id])).join('');
+    initPendingPdfViewers();
   }
 
   // ============================================================
