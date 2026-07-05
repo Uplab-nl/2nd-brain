@@ -250,6 +250,8 @@
   .co-avatar { width:34px; height:34px; border-radius:50%; background:var(--grad-purple); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0; }
   .co-profile textarea { width:100%; border:1.5px solid var(--line); border-radius:11px; padding:10px 12px; font-family:inherit; font-size:14px; color:var(--ink-soft); resize:vertical; min-height:60px; margin-top:6px; }
   .co-profile textarea:focus { outline:none; border-color:var(--purple); box-shadow:0 0 0 3px rgba(138,92,255,.14); }
+  .tl-notes textarea { width:100%; border:1.5px solid var(--line); border-radius:11px; padding:10px 12px; font-family:inherit; font-size:14px; color:var(--ink-soft); resize:vertical; min-height:70px; margin-top:6px; }
+  .tl-notes textarea:focus { outline:none; border-color:var(--purple); box-shadow:0 0 0 3px rgba(138,92,255,.14); }
   .tl-head { display:flex; align-items:center; gap:14px; margin-bottom:8px; flex-wrap:wrap; }
   .tl-title { font-size:22px; font-weight:700; letter-spacing:-.02em; }
   .tl-sub { color:var(--ink-soft); font-size:14px; font-weight:300; margin-bottom:20px; }
@@ -2220,6 +2222,7 @@
           }
           close();
           if(!$('coTimelineView').classList.contains('hidden')) openTimeline(id);
+          if(data?.mail_error) alert('Afspraak staat in de agenda, maar de mail ging niet uit: '+data.mail_error);
         }catch(e){
           btn.disabled=false; btn.innerHTML=orig;
           alert('Kon afspraak niet inplannen: '+e.message);
@@ -2414,7 +2417,7 @@
         const isPast=item._when<new Date();
         let inner=`<div class="card-title">\u{1F4C5} ${esc(a.title||'Afspraak')} <span class="pill note" style="text-transform:none;margin-left:6px;">${isPast?'geweest':'gepland'} \u00b7 ${tijd}</span></div>`;
         if(a.meet_link) inner+=`<p style="margin:6px 0;"><a href="${esc(a.meet_link)}" target="_blank" style="color:var(--blue);">\u{1F4F9} Meet-link openen \u2197</a></p>`;
-        inner+=`<div class="section-label" style="margin-top:8px;"><span>Aantekeningen</span></div><textarea placeholder="Waar ging het over, wat viel op\u2026 Dain leest dit mee." onblur="saveApptNotes('${a.id}',this.value)" style="min-height:70px;">${esc(a.notes||'')}</textarea>`;
+        inner+=`<div class="section-label" style="margin-top:8px;"><span>Aantekeningen</span></div><div class="tl-notes"><textarea placeholder="Waar ging het over, wat viel op\u2026 Dain leest dit mee." onblur="saveApptNotes('${a.id}',this.value)">${esc(a.notes||'')}</textarea></div>`;
         html+=`<div class="tl-item"><div class="tl-dot"></div><div class="tl-date">${when}</div><div class="tl-card">${inner}</div></div>`;
         return;
       }
