@@ -714,6 +714,7 @@
           <button class="upload-btn" id="bkCreateBtn"><span class="mi" style="background:linear-gradient(135deg,#ff9f43,#ff6b5a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>Boek toevoegen</button>
         </div>
       </div>
+      <div class="bucket-bar" id="bookBucketBar"></div>
       <div id="bkCards" class="feed"></div>
     </div>
 
@@ -916,7 +917,7 @@
     if(error){ loginErr.textContent='Inloggen mislukt: controleer je e-mail en wachtwoord.'; loginBtn.disabled=false; loginBtn.textContent='Inloggen'; return; }
     showApp();
   }
-  async function showApp(){ loginScreen.classList.add('hidden'); app.classList.remove('hidden'); await loadNotebooks(); await loadCoacheeList(); await loadTemplateList(); await loadRecBuckets(); await loadNoteBuckets(); await loadNotesIndex(); await loadBuckets(); switchTab('dash'); handleShareTarget(); refreshGoogleStatusUI(); handleGoogleOAuthCallback(); }
+  async function showApp(){ loginScreen.classList.add('hidden'); app.classList.remove('hidden'); await loadNotebooks(); await loadCoacheeList(); await loadTemplateList(); await loadRecBuckets(); await loadNoteBuckets(); await loadBookBuckets(); await loadNotesIndex(); await loadBuckets(); switchTab('dash'); handleShareTarget(); refreshGoogleStatusUI(); handleGoogleOAuthCallback(); }
   async function doLogout(){ await sb.auth.signOut(); app.classList.add('hidden'); loginScreen.classList.remove('hidden'); loginBtn.disabled=false; loginBtn.textContent='Inloggen'; $('password').value=''; }
   loginBtn.addEventListener('click',doLogin);
   $('password').addEventListener('keydown',e=>{ if(e.key==='Enter')doLogin(); });
@@ -1233,7 +1234,7 @@
     chat:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.8-.9L3 20l1.1-4.3a8.4 8.4 0 0 1 15.9-4.2z"/></svg>`,
     palette:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2s-.5-1.5-.5-2.5S14 15 15 15h3a3 3 0 0 0 3-3c0-5-4-9-9-9z"/><circle cx="7.5" cy="10.5" r="1.1"/><circle cx="12" cy="7.5" r="1.1"/><circle cx="16.5" cy="10.5" r="1.1"/></svg>`,
   };
-  const COL={ rec:'linear-gradient(135deg,#ff6b5a,#ff5a8a)', note:'linear-gradient(135deg,#ff5adb,#ff9f43)', map:'linear-gradient(135deg,#7367f0,#5a9cff)', book:'linear-gradient(135deg,#ff9f43,#ff6b5a)', doc:'linear-gradient(135deg,#3b82f6,#6366f1)', danger:'linear-gradient(135deg,#ff6b5a,#e05252)', neutral:'linear-gradient(135deg,#9aa3b2,#6b7280)', dain:'var(--grad-purple)', green:'#549E39', coach:'linear-gradient(135deg,#5a9cff,#7367f0)' };
+  const COL={ rec:'linear-gradient(135deg,#ff6b5a,#ff5a8a)', note:'linear-gradient(135deg,#ff5adb,#ff9f43)', map:'linear-gradient(135deg,#7367f0,#5a9cff)', book:'linear-gradient(135deg,#ff9f43,#ff6b5a)', doc:'linear-gradient(135deg,#3b82f6,#6366f1)', danger:'linear-gradient(135deg,#ff6b5a,#e05252)', neutral:'linear-gradient(135deg,#9aa3b2,#6b7280)', dain:'var(--grad-purple)', green:'linear-gradient(135deg,#549E39,#7ac142)', coach:'linear-gradient(135deg,#5a9cff,#7367f0)' };
 
   function recCardHTML(r){
     const hasTranscript=(r.transcripts||[]).length>0;
@@ -1256,7 +1257,7 @@
     if(hasTranscript) body+=`<div class="section-label transcript-toggle" onclick="toggleTranscript('${r.id}')" style="cursor:pointer;"><span>Transcriptie <span id="txcaret-${r.id}">\u25B8</span></span></div><div class="text-block hl-zone hidden" data-rec="${r.id}" id="tx-${r.id}"></div>`;
     let btns='';
     if(!hasTranscript && (r.status==='uploaded'||r.status==='failed')) btns+=`<button class="act" onclick="startTranscribe('${r.id}',this)">${mi(COL.rec,ICO.play)}Start transcriptie</button>`;
-    if(r.status==='transcribing') btns+=`<button class="act" disabled>\u23F3 Aan het transcriberen\u2026</button>`;
+    if(r.status==='transcribing') btns+=`<button class="act" onclick="resetStuckTranscription('${r.id}',this)">\u23F3 Bezig\u2026 (vastgelopen? klik hier)</button>`;
     const tplOpts=`<option value="">Dain kiest zelf</option>`+templates.map(t=>`<option value="${t.id}" ${t.id===r.template_id?'selected':''}>${esc(t.name)}</option>`).join('');
     const tplPick=templates.length?`<select id="tplsel-${r.id}" onclick="event.stopPropagation()" style="font-size:13px;padding:9px 12px;border:1.5px solid var(--line);border-radius:11px;font-family:inherit;color:var(--ink-soft);background:#fff;">${tplOpts}</select>`:'';
     // Eén samenvat-knop, geen dubbele — het label verandert simpelweg mee met de status
@@ -1335,7 +1336,7 @@
 
   function bookCardHTML(b){
     return `<article class="card collapsible" onclick="toggleCard(this)">
-      <div class="card-head"><div style="display:flex;align-items:center;gap:14px;flex:1;"><span class="bk-cover"></span><div><div class="card-title">${esc(b.title)}</div><div class="card-meta">${b.author?esc(b.author):'Onbekende auteur'}</div></div></div>${starHTML('book_summaries',b.id,b.favorite)}${delChipHTML(`delBook('${b.id}',this)`)}<span class="pill ${b.status==='summarized'?'summarized':'uploaded'}">${b.status==='summarized'?'samengevat':'concept'}</span><span class="card-caret">\u25B6</span></div>
+      <div class="card-head"><div style="display:flex;align-items:center;gap:14px;flex:1;"><span class="bk-cover"></span><div><div class="card-title">${esc(b.title)}</div><div class="card-meta">${b.author?esc(b.author):'Onbekende auteur'}</div></div></div>${starHTML('book_summaries',b.id,b.favorite)}<button class="del-chip" style="color:var(--ink-soft);" onclick="event.stopPropagation();editBook('${b.id}','${escJs(b.title||'')}','${escJs(b.author||'')}')" title="Titel/auteur wijzigen">${ICO.pencil}</button>${delChipHTML(`delBook('${b.id}',this)`)}<span class="pill ${b.status==='summarized'?'summarized':'uploaded'}">${b.status==='summarized'?'samengevat':'concept'}</span><span class="card-caret">\u25B6</span></div>
       ${b.ai_summary?`<div class="card-preview">${preview2(b.ai_summary)}</div>`:''}
       <div class="card-body" onclick="event.stopPropagation()">${bookBodyHTML(b)}</div>
       <div class="card-actions" onclick="event.stopPropagation()">${b.status!=='summarized'?`<button class="act primary" onclick="summarizeBook('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Laat Dain analyseren</button>`:`<button class="act" onclick="summarizeBook('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Opnieuw analyseren</button>`}</div></article>`;
@@ -2779,7 +2780,7 @@
       if(acties.length) out+=`<div class="section-label"><span>Acties</span></div><ul class="actions">${acties.map(a=>`<li>${esc(a.content)}</li>`).join('')}</ul>`;
       let tlBtns='';
       if(!hasTx && (s.status==='uploaded'||s.status==='failed')) tlBtns+=`<button class="act" onclick="startTranscribe('${s.id}',this)">${mi(COL.rec,ICO.play)}Start transcriptie</button>`;
-      if(s.status==='transcribing') tlBtns+=`<button class="act" disabled>\u23F3 Aan het transcriberen\u2026</button>`;
+      if(s.status==='transcribing') tlBtns+=`<button class="act" onclick="resetStuckTranscription('${s.id}',this)">\u23F3 Bezig\u2026 (vastgelopen? klik hier)</button>`;
       if(s.status==='transcribed'||s.status==='summarized') tlBtns+=`<button class="act primary" onclick="summarizeWithTpl('${s.id}',this)">${mi(COL.dain,ICO.sparkle)}${s.status==='summarized'?'Opnieuw samenvatten':'Laat Dain samenvatten'}</button>`;
       if(tlBtns) out+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">${tlBtns}</div>`;
       if(hasTx) out+=`<div class="section-label transcript-toggle" onclick="toggleTranscript('${s.id}')" style="cursor:pointer;margin-top:10px;"><span>Transcriptie <span id="txcaret-${s.id}">\u25B8</span></span></div><div class="text-block hl-zone hidden" data-rec="${s.id}" id="tx-${s.id}"></div>`;
@@ -2904,12 +2905,16 @@
       </div>`;
     const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,id)=>id===b.notebook_id?`value="${id}" selected`:m);
     const nbPick=`<select onchange="setBookNotebook('${b.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select>`;
-    body+=`<div class="section-label"><span>Notitieboek</span></div><div>${nbPick}</div>`;
+    const bkPick=`<select onchange="event.stopPropagation();setBookBucket('${b.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${bookBucketOptions(b.bucket_id)}</select>`;
+    body+=`<div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${nbPick} ${bkPick}</div>`;
     return body;
   }
 
   async function loadBooks(){
-    const { data:books, error }=await sb.from('book_summaries').select('*').order('created_at',{ascending:false});
+    if(!bookBuckets.length) await loadBookBuckets(); else renderBookBucketBar();
+    let q=sb.from('book_summaries').select('*').order('created_at',{ascending:false});
+    if(activeBookBucket!=='all') q=q.eq('bucket_id',activeBookBucket);
+    const { data:books, error }=await q;
     if(error){ $('bkCards').innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
     conn.textContent=`\u25CF ${books.length} boek${books.length===1?'':'en'}`;
     if(!books.length){ $('bkCards').innerHTML=`<div class="empty"><div class="big">Nog geen boeken</div><p>Voeg hierboven je eerste boek toe.</p></div>`; return; }
@@ -2945,6 +2950,21 @@
     }catch(e){ alert('Verbindingsfout: '+e.message); btn.disabled=false; btn.textContent=original; }
   }
 
+  function editBook(id,title,author){
+    const body=`
+      <label>Titel</label><input type="text" id="ebTitle" value="${esc(title)}">
+      <label>Auteur</label><input type="text" id="ebAuthor" value="${esc(author)}" placeholder="Onbekende auteur">
+      <div class="sheet-actions"><button class="act" id="ebCancel">Annuleren</button><button class="act primary" id="ebSave">Opslaan</button></div>`;
+    openSheet('\u270E Titel & auteur wijzigen', body, (ov,close)=>{
+      $('ebCancel').onclick=close;
+      $('ebSave').onclick=async()=>{
+        const t=$('ebTitle').value.trim(); if(!t){ alert('Een titel heb je wel nodig.'); return; }
+        const a=$('ebAuthor').value.trim();
+        await sb.from('book_summaries').update({ title:t, author:a||null }).eq('id',id);
+        close(); loadBooks();
+      };
+    });
+  }
   async function delBook(id,btn){
     if(!confirm('Dit boek verwijderen?')) return;
     btn.disabled=true;
@@ -3151,7 +3171,7 @@
   // embeddings (afgeleide zoekindex, is zo weer opgebouwd via 'Herindexeer').
   const BACKUP_TABLES=['notebooks','recordings','transcripts','summaries','action_items','notes',
     'coachees','recording_coachees','mindmaps','mindmap_nodes','book_summaries','templates','documents',
-    'inspiration','inspiration_buckets','mindmap_buckets','recording_buckets','note_buckets','appointments','attachments'];
+    'inspiration','inspiration_buckets','mindmap_buckets','recording_buckets','note_buckets','appointments','attachments','book_buckets'];
   async function exportBackup(btn){
     const original=btn.innerHTML; btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Verzamelen\u2026';
     try{
@@ -3471,6 +3491,53 @@
   async function setRecAppointment(id,apptId){
     await sb.from('recordings').update({ appointment_id:apptId||null }).eq('id',id);
   }
+
+  // ---- Buckets voor boeken (zelfde patroon als notities/opnames) ----
+  let bookBuckets=[], activeBookBucket='all';
+  async function loadBookBuckets(){
+    const { data }=await sb.from('book_buckets').select('*').order('created_at',{ascending:true});
+    bookBuckets=data||[];
+    renderBookBucketBar();
+  }
+  function renderBookBucketBar(){
+    const bar=$('bookBucketBar'); if(!bar) return;
+    let html=`<span class="bucket-chip ${activeBookBucket==='all'?'on':''}" style="${activeBookBucket==='all'?'background:var(--grad-purple)':''}" onclick="pickBookBucket('all')">\u2728 Alles</span>`;
+    bookBuckets.forEach(b=>{
+      const on=activeBookBucket===b.id;
+      html+=`<span class="bucket-chip ${on?'on':''}" style="${on?'background:'+b.color:''}" onclick="pickBookBucket('${b.id}')">
+        <span class="bdot" style="background:${on?'#fff':b.color}"></span>${esc(b.name)}
+        <span class="bx" onclick="event.stopPropagation();renameBookBucket('${b.id}')" title="Hernoem">\u270E</span>
+        <span class="bx" onclick="event.stopPropagation();deleteBookBucket('${b.id}')" title="Verwijder">\u2715</span>
+      </span>`;
+    });
+    html+=`<button class="bucket-chip bucket-add" onclick="addBookBucket()">+ Nieuwe bucket</button>`;
+    bar.innerHTML=html;
+  }
+  function pickBookBucket(id){ activeBookBucket=id; renderBookBucketBar(); loadBooks(); }
+  function bookBucketOptions(sel){ return `<option value="">Geen bucket</option>`+bookBuckets.map(b=>`<option value="${b.id}" ${b.id===sel?'selected':''}>${esc(b.name)}</option>`).join(''); }
+  async function addBookBucket(){
+    const name=await promptModal('Naam van de nieuwe bucket'); if(!name) return;
+    const palette=['#8a5cff','#ff5adb','#ff9f43','#5a9cff','#ff6b5a','#3dd6b0'];
+    const color=palette[bookBuckets.length % palette.length];
+    const { data:{ user } }=await sb.auth.getUser();
+    await sb.from('book_buckets').insert({ user_id:user.id, name:name, color });
+    await loadBookBuckets();
+  }
+  async function renameBookBucket(id){
+    const b=bookBuckets.find(x=>x.id===id); if(!b) return;
+    const name=await promptModal('Nieuwe naam', b.name); if(!name) return;
+    await sb.from('book_buckets').update({ name:name }).eq('id',id);
+    await loadBookBuckets();
+  }
+  async function deleteBookBucket(id){
+    if(!confirm('Deze bucket verwijderen? De boeken erin blijven bestaan (belanden in \u2018Alles\u2019).')) return;
+    await sb.from('book_buckets').delete().eq('id',id);
+    if(activeBookBucket===id) activeBookBucket='all';
+    await loadBookBuckets(); loadBooks();
+  }
+  async function setBookBucket(id,bucketId){
+    await sb.from('book_summaries').update({ bucket_id:bucketId||null }).eq('id',id);
+  }
   async function openRecLinks(id,nbId,coId,bkId,apptId){
     const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,vid)=>vid===nbId?`value="${vid}" selected`:m);
     const coachOpts=`<option value="">\u2014 koppel coachee \u2014</option>`+coachees.map(c=>`<option value="${c.id}" ${c.id===coId?'selected':''}>${esc(c.name)}</option>`).join('');
@@ -3553,21 +3620,35 @@
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     a.download=(rec.title||'verslag').replace(/[^a-zA-Z0-9]/g,'_')+'.html'; a.click(); URL.revokeObjectURL(a.href);
   }
+  async function resetStuckTranscription(id,btn){
+    if(!confirm('Deze transcriptie lijkt vastgelopen. Terugzetten zodat je het opnieuw kan proberen?')) return;
+    btn.disabled=true; btn.textContent='Bezig met resetten\u2026';
+    await sb.from('recordings').update({ status:'uploaded' }).eq('id',id);
+    load();
+  }
   async function startTranscribe(id,btn){
     if(!btn) return;
     btn.disabled=true;
-    
+
     try {
       // Update status naar "transcribing" eerst
       await sb.from('recordings').update({status:'transcribing'}).eq('id',id);
       await load();
-      
-      // Call transcribe via fetch
-      const res=await fetch('https://stsmbpgtdtzscpswbwww.supabase.co/functions/v1/transcribe',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({recording_id:id})
-      });
+
+      // Cli\u00ebntzijdig vangnet: als de verbinding blijft hangen (bijv. telefoon vergrendelt tijdens het wachten),
+      // breken we zelf na 4,5 minuut af i.p.v. voor altijd te wachten op een reactie die nooit meer komt.
+      const controller=new AbortController();
+      const clientTimeout=setTimeout(()=>controller.abort(),270000);
+      let res;
+      try{
+        res=await fetch('https://stsmbpgtdtzscpswbwww.supabase.co/functions/v1/transcribe',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({recording_id:id}),
+          signal:controller.signal
+        });
+      } finally { clearTimeout(clientTimeout); }
+
       const data=await res.json();
       if(data.error){
         alert('Transcriptie fout: '+data.error);
@@ -3577,7 +3658,14 @@
       }
       await load();
     } catch(e){
-      alert('Verbindingsfout: '+e.message);
+      // Check eerst of de server 'm ondertussen zelf al heeft afgerond, voor we die status overschrijven
+      const { data:current }=await sb.from('recordings').select('status').eq('id',id).maybeSingle();
+      if(current?.status==='transcribing'){
+        await sb.from('recordings').update({status:'failed'}).eq('id',id);
+        alert('De verbinding viel weg tijdens het transcriberen \u2014 dit gebeurt vaak als je telefoon tussentijds in slaap valt of je van app wisselt. Probeer het opnieuw en laat het scherm het liefst aan staan tot-ie klaar is.');
+      } else {
+        alert('Verbindingsfout: '+e.message);
+      }
       await load();
     }
   }
