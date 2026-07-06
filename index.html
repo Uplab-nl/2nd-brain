@@ -413,6 +413,10 @@
   .del-chip svg { width:14px; height:14px; display:block; }
   .del-chip:hover { background:#fff2f2; border-color:#e05252; }
   .tl-followup { background:#eef6ff; border:1px solid #bfdcff; border-radius:10px; padding:10px 12px; font-size:13.5px; color:var(--ink); margin:8px 0; line-height:1.5; }
+  .speaker-names { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding-bottom:10px; border-bottom:1px dashed var(--line); }
+  .speaker-tag { display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-faint); }
+  .speaker-tag input { width:120px; font-size:12.5px; padding:4px 8px; border:1.5px solid var(--line); border-radius:8px; font-family:inherit; }
+  .speaker-tag input:focus { outline:none; border-color:var(--purple); }
 
   /* Popup / grote modal in huisstijl */
   .sheet-overlay { position:fixed; inset:0; background:rgba(44,44,58,.62); display:flex; align-items:center; justify-content:center; z-index:120; padding:24px; }
@@ -894,9 +898,37 @@
     if(willShow && !el.dataset.loaded){
       el.dataset.loaded='1';
       el.innerHTML='<span style="color:var(--ink-faint);">Laden\u2026</span>';
-      const { data, error }=await sb.from('transcripts').select('full_text').eq('recording_id',recId).maybeSingle();
-      el.textContent = error||!data?.full_text ? '(kon transcript niet laden)' : data.full_text;
+      const [{ data:tr, error }, { data:rec }]=await Promise.all([
+        sb.from('transcripts').select('full_text,segments').eq('recording_id',recId).maybeSingle(),
+        sb.from('recordings').select('speaker_names').eq('id',recId).maybeSingle()
+      ]);
+      if(error||!tr){ el.innerHTML='<span style="color:var(--ink-faint);">(kon transcript niet laden)</span>'; return; }
+      el.innerHTML=renderTranscriptHTML(recId,tr,rec?.speaker_names||{});
     }
+  }
+  function renderTranscriptHTML(recId,tr,names){
+    if(Array.isArray(tr.segments) && tr.segments.length && tr.segments[0]?.speaker){
+      const speakers=[...new Set(tr.segments.map(s=>s.speaker))];
+      let head=`<div class="speaker-names">`;
+      speakers.forEach(sp=>{
+        head+=`<span class="speaker-tag"><span>Spreker ${esc(sp)}:</span><input type="text" value="${esc(names[sp]||'')}" placeholder="naam geven\u2026" onclick="event.stopPropagation()" onchange="setSpeakerName('${recId}',this)" data-speaker="${esc(sp)}"></span>`;
+      });
+      head+='</div>';
+      const body=tr.segments.map(s=>`<p style="margin:0 0 8px;"><strong>${esc(names[s.speaker]||('Spreker '+s.speaker))}:</strong> ${esc(s.text)}</p>`).join('');
+      return head+body;
+    }
+    return esc(tr.full_text||'(geen tekst)').replace(/\n/g,'<br>');
+  }
+  async function setSpeakerName(recId,input){
+    const speaker=input.dataset.speaker, name=input.value.trim();
+    const { data:rec }=await sb.from('recordings').select('speaker_names').eq('id',recId).maybeSingle();
+    const names=rec?.speaker_names||{};
+    if(name) names[speaker]=name; else delete names[speaker];
+    await sb.from('recordings').update({ speaker_names:names }).eq('id',recId);
+    // Transcript direct opnieuw tekenen met de nieuwe naam, zonder de hele kaart te herladen
+    const el=document.getElementById('tx-'+recId); if(!el) return;
+    const { data:tr }=await sb.from('transcripts').select('full_text,segments').eq('recording_id',recId).maybeSingle();
+    if(tr){ el.innerHTML=renderTranscriptHTML(recId,tr,names); }
   }
   async function playAudio(recId,btn){
     btn.disabled=true; const orig=btn.innerHTML; btn.innerHTML='\u2026';
@@ -3629,45 +3661,47 @@
   async function startTranscribe(id,btn){
     if(!btn) return;
     btn.disabled=true;
-
     try {
-      // Update status naar "transcribing" eerst
       await sb.from('recordings').update({status:'transcribing'}).eq('id',id);
       await load();
 
-      // Cli\u00ebntzijdig vangnet: als de verbinding blijft hangen (bijv. telefoon vergrendelt tijdens het wachten),
-      // breken we zelf na 4,5 minuut af i.p.v. voor altijd te wachten op een reactie die nooit meer komt.
-      const controller=new AbortController();
-      const clientTimeout=setTimeout(()=>controller.abort(),270000);
-      let res;
-      try{
-        res=await fetch('https://stsmbpgtdtzscpswbwww.supabase.co/functions/v1/transcribe',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({recording_id:id}),
-          signal:controller.signal
-        });
-      } finally { clearTimeout(clientTimeout); }
-
+      const res=await fetch('https://stsmbpgtdtzscpswbwww.supabase.co/functions/v1/transcribe',{
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({recording_id:id})
+      });
       const data=await res.json();
       if(data.error){
         alert('Transcriptie fout: '+data.error);
         await sb.from('recordings').update({status:'failed'}).eq('id',id);
-      } else {
-        embedContent('recordings',id);
+        await load();
+        return;
       }
-      await load();
+      // De opdracht staat nu bij AssemblyAI in de wachtrij \u2014 we hoeven niet te wachten,
+      // de webhook werkt de status vanzelf bij. Zachtjes pollen zodat de kaart vanzelf ververst.
+      pollTranscriptionStatus(id);
     } catch(e){
-      // Check eerst of de server 'm ondertussen zelf al heeft afgerond, voor we die status overschrijven
       const { data:current }=await sb.from('recordings').select('status').eq('id',id).maybeSingle();
       if(current?.status==='transcribing'){
         await sb.from('recordings').update({status:'failed'}).eq('id',id);
-        alert('De verbinding viel weg tijdens het transcriberen \u2014 dit gebeurt vaak als je telefoon tussentijds in slaap valt of je van app wisselt. Probeer het opnieuw en laat het scherm het liefst aan staan tot-ie klaar is.');
+        alert('Kon de transcriptie niet starten: '+e.message);
       } else {
         alert('Verbindingsfout: '+e.message);
       }
       await load();
     }
+  }
+  function pollTranscriptionStatus(id){
+    let tries=0;
+    const timer=setInterval(async()=>{
+      tries++;
+      const { data:rec }=await sb.from('recordings').select('status').eq('id',id).maybeSingle();
+      if(!rec || rec.status!=='transcribing'){
+        clearInterval(timer);
+        if(rec?.status==='transcribed') embedContent('recordings',id);
+        load();
+        return;
+      }
+      if(tries>60) clearInterval(timer); // na ~15 min stoppen we met pollen; de handmatige 'vastgelopen?'-knop blijft beschikbaar
+    },15000);
   }
 
   // ================= GLOBAAL ZOEKEN =================
