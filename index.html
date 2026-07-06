@@ -134,7 +134,7 @@
   .note-composer input.note-title:focus { outline:none; }
   .note-composer textarea { width:100%; border:none; font-family:inherit; font-size:14.5px; color:var(--ink-soft); resize:vertical; min-height:70px; line-height:1.6; }
   .note-composer textarea:focus { outline:none; }
-  .note-composer .nc-foot { display:flex; justify-content:space-between; align-items:center; margin-top:12px; border-top:1px solid var(--line); padding-top:12px; }
+  .note-composer .nc-foot { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin-top:12px; border-top:1px solid var(--line); padding-top:12px; }
   .note-composer select { padding:8px 12px; border:1.5px solid var(--line); border-radius:9px; font-family:inherit; font-size:13px; background:#fff; }
   .save-status { font-size:12.5px; color:var(--ink-faint); font-weight:400; transition:color .2s; min-height:16px; }
   .save-status.saving { color:var(--purple); }
@@ -221,7 +221,11 @@
   .db-quick button { display:flex; align-items:center; gap:11px; text-align:left; padding:10px 15px; border-radius:11px; border:1.5px solid var(--line); background:#fff; font-family:inherit; font-size:14px; font-weight:500; color:var(--ink-soft); cursor:pointer; transition:all .15s; }
   .db-quick button:hover { border-color:var(--purple); color:var(--purple); transform:translateX(3px); }
   .db-empty { color:var(--ink-faint); font-size:13px; font-style:italic; }
-  @media (max-width:600px){ .dash-grid{ grid-template-columns:1fr; } }
+  @media (max-width:600px){
+    .dash-grid{ grid-template-columns:1fr; }
+    .note-composer .nc-foot > select, .note-composer .nc-foot > div { width:100%; }
+    .note-composer .nc-foot > div { justify-content:space-between; }
+  }
   .feed { padding-bottom:80px; display:flex; flex-direction:column; gap:16px; }
   .card { background:var(--card); border-radius:16px; box-shadow:var(--shadow-sm); overflow:hidden; transition:transform .18s ease,box-shadow .18s ease; }
   .card:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); }
@@ -430,7 +434,7 @@
   .sheet-body input[type=text], .sheet-body input[type=url], .sheet-body input[type=datetime-local], .sheet-body textarea, .sheet-body select { width:100%; padding:11px 14px; border:1.5px solid var(--line); border-radius:11px; font-family:inherit; font-size:14px; color:var(--ink); background:#fff; }
   .sheet-body input:focus, .sheet-body textarea:focus, .sheet-body select:focus { outline:none; border-color:var(--purple); box-shadow:0 0 0 3px rgba(138,92,255,.14); }
   .sheet-body textarea { resize:vertical; min-height:80px; }
-  .sheet-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:22px; }
+  .sheet-actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top:22px; }
 
   /* Template-picker chips */
   .tpl-pick-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px; }
@@ -514,10 +518,10 @@
       <div class="snav" data-tab="fav" onclick="switchTab('fav')"><span class="ic" style="background:linear-gradient(135deg,#ffc93c,#ff9f43)"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 17l-5.3 2.6 1-5.8L3.5 9.7l5.9-.9z"/></svg></span> Favorieten</div>
       <div class="snav" data-tab="rec" onclick="switchTab('rec')"><span class="ic" style="background:linear-gradient(135deg,#ff6b5a,#ff5a8a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v4"/></svg></span> Opnames</div>
       <div class="snav" data-tab="note" onclick="switchTab('note')"><span class="ic" style="background:linear-gradient(135deg,#ff5adb,#ff9f43)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span> Notities</div>
-      <div class="snav" data-tab="map" onclick="switchTab('map')"><span class="ic" style="background:linear-gradient(135deg,#7367f0,#5a9cff)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="19" cy="18" r="1.8"/><path d="M10 11 6.4 7M14 11l3.6-4M14 13l3.6 4"/></svg></span> Mindmaps</div>
+      <div class="snav" data-tab="map" onclick="switchTab('map')"><span class="ic" style="background:linear-gradient(135deg,#6366f1,#22d3ee)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="19" cy="18" r="1.8"/><path d="M10 11 6.4 7M14 11l3.6-4M14 13l3.6 4"/></svg></span> Mindmaps</div>
       <div class="snav" data-tab="insp" onclick="switchTab('insp')"><span class="ic" style="background:linear-gradient(135deg,#3dd6b0,#5a9cff)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 6l1.4 1.4M19 6l-1.4 1.4M4 12H2M22 12h-2"/><path d="M9 16a5 5 0 1 1 6 0c-.6.5-1 1-1 2h-4c0-1-.4-1.5-1-2z"/><path d="M10 21h4"/></svg></span> Inspiratie</div>
-      <div class="snav" data-tab="book" onclick="switchTab('book')"><span class="ic" style="background:linear-gradient(135deg,#ff9f43,#ff6b5a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M18 16H7a2 2 0 0 0-2 2"/></svg></span> Boeken</div>
-      <div class="snav" data-tab="doc" onclick="switchTab('doc')"><span class="ic" style="background:linear-gradient(135deg,#3b82f6,#6366f1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v5h5"/></svg></span> Documenten</div>
+      <div class="snav" data-tab="book" onclick="switchTab('book')"><span class="ic" style="background:linear-gradient(135deg,#f59e0b,#b45309)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M18 16H7a2 2 0 0 0-2 2"/></svg></span> Boeken</div>
+      <div class="snav" data-tab="doc" onclick="switchTab('doc')"><span class="ic" style="background:linear-gradient(135deg,#64748b,#334155)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v5h5"/></svg></span> Documenten</div>
       <div class="snav" data-tab="coach" onclick="switchTab('coach')"><span class="ic" style="background:linear-gradient(135deg,#8a5cff,#ff5adb)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 6.5a3 3 0 0 1 0 5.5"/><path d="M18 20a6 6 0 0 0-3-5.2"/></svg></span> Coachees</div>
     </nav>
     <div class="sb-label">Notitieboeken</div>
@@ -889,6 +893,12 @@
   function toggleCard(el){
     el.classList.toggle('open');
   }
+  function toggleDashFold(key){
+    const box=document.getElementById(key+'Box'); const caret=document.getElementById(key+'Caret');
+    if(!box) return;
+    box.classList.toggle('hidden');
+    if(caret) caret.textContent=box.classList.contains('hidden')?'\u25B8':'\u25BE';
+  }
   async function toggleTranscript(recId){
     const el=document.getElementById('tx-'+recId); const caret=document.getElementById('txcaret-'+recId);
     if(!el) return;
@@ -958,6 +968,7 @@
   // ---- Tabs ----
   function switchTab(t){
     activeTab=t;
+    activeNB='all'; // voorkomt dat een notitieboek-filter onzichtbaar meereist naar een ander tabblad
     document.querySelectorAll('.snav').forEach(el=>el.classList.toggle('active',el.dataset.tab===t));
     document.querySelectorAll('.sb-daintop button').forEach(el=>el.classList.toggle('active',t==='chat'));
     const panes={dash:'paneDash',fav:'paneFav',rec:'paneRec',note:'paneNote',chat:'paneChat',map:'paneMap',insp:'paneInsp',coach:'paneCoach',tpl:'paneTpl',book:'paneBook',doc:'paneDoc',search:'paneSearch'};
@@ -1246,6 +1257,41 @@
   function delChipHTML(onclickJs){ return `<button class="del-chip" onclick="event.stopPropagation();${onclickJs}" title="Verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></button>`; }
   // ---- Herbruikbare icoon-chips voor knoppen: wit blijft de basis, het kleurtje zit alleen in het chipje ----
   function mi(bg,svg){ return `<span class="mi" style="background:${bg}">${svg}</span>`; }
+  // ================= MULTI-BUCKET SYSTEEM (herbruikbaar voor notities/opnames/boeken/inspiratie/mindmaps) =================
+  async function loadBucketLinksFor(linkTable,itemCol,itemIds){
+    if(!itemIds.length) return {};
+    const { data }=await sb.from(linkTable).select(itemCol+',bucket_id').in(itemCol,itemIds);
+    const map={};
+    (data||[]).forEach(r=>{ (map[r[itemCol]]=map[r[itemCol]]||[]).push(r.bucket_id); });
+    return map;
+  }
+  async function itemIdsForBucket(linkTable,itemCol,bucketId){
+    const { data }=await sb.from(linkTable).select(itemCol).eq('bucket_id',bucketId);
+    return (data||[]).map(r=>r[itemCol]);
+  }
+  async function setBucketLinks(linkTable,itemCol,itemId,bucketIds){
+    const { data:{ user } }=await sb.auth.getUser();
+    await sb.from(linkTable).delete().eq(itemCol,itemId);
+    if(bucketIds.length) await sb.from(linkTable).insert(bucketIds.map(bid=>({ [itemCol]:itemId, bucket_id:bid, user_id:user.id })));
+  }
+  function openBucketPicker(title,buckets,currentIds,onSave){
+    const rows=buckets.length
+      ? buckets.map(b=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer;"><input type="checkbox" value="${b.id}" ${currentIds.includes(b.id)?'checked':''} style="width:18px;height:18px;flex-shrink:0;"><span class="bdot" style="background:${b.color};width:10px;height:10px;border-radius:50%;flex-shrink:0;"></span><span>${esc(b.name)}</span></label>`).join('')
+      : '<p style="color:var(--ink-faint);font-size:13.5px;">Nog geen buckets aangemaakt \u2014 maak er eentje via de bucket-balk bovenaan.</p>';
+    const body=`<div id="bpRows">${rows}</div><div class="sheet-actions"><button class="act" id="bpCancel">Annuleren</button><button class="act primary" id="bpSave">Opslaan</button></div>`;
+    openSheet(title,body,(ov,close)=>{
+      $('bpCancel').onclick=close;
+      $('bpSave').onclick=()=>{
+        const checked=[...ov.querySelectorAll('#bpRows input[type=checkbox]:checked')].map(i=>i.value);
+        onSave(checked); close();
+      };
+    });
+  }
+  function bucketChipHTML(ids,buckets,onClick){
+    const names=ids.map(id=>buckets.find(b=>b.id===id)).filter(Boolean);
+    const label=names.length?names.map(b=>b.name).join(', '):'Geen buckets';
+    return `<button class="act" onclick="${onClick}">${mi(COL.neutral,ICO.link)}${esc(label)}</button>`;
+  }
   const ICO={
     play:`<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`,
     trash:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>`,
@@ -1272,7 +1318,8 @@
     const hasTranscript=(r.transcripts||[]).length>0;
     const sectionRows=(r.summaries||[]).filter(s=>s.kind==='section').sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));
     const summary=(r.summaries||[]).find(s=>s.kind==='summary')?.content;
-    const insights=(r.summaries||[]).find(s=>s.kind==='coaching_insights')?.content;
+    const insightsRow=(r.summaries||[]).find(s=>s.kind==='coaching_insights');
+    const insights=insightsRow?.content;
     const actions=r.action_items||[];
     const when=new Date(r.recorded_at||r.created_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
     const nb=nbById(r.notebook_id);
@@ -1283,7 +1330,7 @@
     } else if(summary){
       body+=`<div class="section-label"><span>Samenvatting</span></div><div class="summary-block">${linkifyWiki(summary)}</div>`;
     }
-    if(insights)   body+=`<div class="section-label"><span>Coaching-inzichten</span></div><div class="text-block">${linkifyWiki(insights)}</div>`;
+    if(insights)   body+=`<div class="section-label"><span>${esc(insightsRow.title||'Inzichten')}</span></div><div class="text-block">${linkifyWiki(insights)}</div>`;
     if(actions.length) body+=`<div class="section-label"><span>Actie-items</span></div><ul class="actions">${actions.map(a=>`<li>${esc(a.content)}</li>`).join('')}</ul>`;
     // Transcript: eigen klein inklap-mechanisme, laadt pas zodra je 'm echt wil zien
     if(hasTranscript) body+=`<div class="section-label transcript-toggle" onclick="toggleTranscript('${r.id}')" style="cursor:pointer;"><span>Transcriptie <span id="txcaret-${r.id}">\u25B8</span></span></div><div class="text-block hl-zone hidden" data-rec="${r.id}" id="tx-${r.id}"></div>`;
@@ -1326,8 +1373,8 @@
     </article>`;
   }
 
-  function noteCardHTML(n,atts){
-    atts=atts||[];
+  function noteCardHTML(n,atts,bucketIds){
+    atts=atts||[]; bucketIds=bucketIds||[];
     const when=new Date(n.created_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
     const nb=nbById(n.notebook_id);
     const nbTag=nb?`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`:'';
@@ -1337,7 +1384,7 @@
     const nbPick=`<select onchange="setNoteNotebook('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select>`;
     const coachOpts=`<option value="">\u2014 koppel coachee \u2014</option>`+coachees.map(cc=>`<option value="${cc.id}" ${cc.id===n.coachee_id?'selected':''}>${esc(cc.name)}</option>`).join('');
     const coachPick=`<select onchange="setNoteCoachee('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${coachOpts}</select>`;
-    const bkPick=`<select onchange="event.stopPropagation();setNoteBucket('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${noteBucketOptions(n.bucket_id)}</select>`;
+    const bkPick=bucketChipHTML(bucketIds,noteBuckets,`event.stopPropagation();openNoteBucketPicker('${n.id}')`);
     const prev=preview2(n.content||'');
     const thumb=atts.find(a=>a.kind==='image');
     const thumbHTML=thumb?`<img src="${thumb.url}" class="note-thumb" alt="">`:'';
@@ -1361,16 +1408,16 @@
 
   function mapCardHTML(m){
     const when=new Date(m.updated_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
-    const bkPick=`<select onchange="event.stopPropagation();setMapBucket('${m.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${mmBucketOptions(m.bucket_id)}</select>`;
+    const bkPick=`<button class="act" onclick="event.stopPropagation();openMmBucketPicker('${m.id}')">${mi(COL.neutral,ICO.link)}Buckets</button>`;
     return `<article class="card open"><div class="card-head"><div style="flex:1;cursor:pointer;" onclick="openMap('${m.id}','${escJs(m.title)}')"><div class="card-title">${esc(m.title)}</div><div class="card-meta">Laatst bewerkt ${when}</div></div>${starHTML('mindmaps',m.id,m.favorite)}${delChipHTML(`askDeleteMindmap('${m.id}',this)`)}<span class="pill summarized">mindmap</span></div>
       <div class="card-actions" onclick="event.stopPropagation()">${bkPick}<button class="act primary" onclick="openMap('${m.id}','${escJs(m.title)}')">${mi(COL.map,ICO.link)}Openen</button></div></article>`;
   }
 
-  function bookCardHTML(b){
+  function bookCardHTML(b,bucketIds){
     return `<article class="card collapsible" onclick="toggleCard(this)">
       <div class="card-head"><div style="display:flex;align-items:center;gap:14px;flex:1;"><span class="bk-cover"></span><div><div class="card-title">${esc(b.title)}</div><div class="card-meta">${b.author?esc(b.author):'Onbekende auteur'}</div></div></div>${starHTML('book_summaries',b.id,b.favorite)}<button class="del-chip" style="color:var(--ink-soft);" onclick="event.stopPropagation();editBook('${b.id}','${escJs(b.title||'')}','${escJs(b.author||'')}')" title="Titel/auteur wijzigen">${ICO.pencil}</button>${delChipHTML(`delBook('${b.id}',this)`)}<span class="pill ${b.status==='summarized'?'summarized':'uploaded'}">${b.status==='summarized'?'samengevat':'concept'}</span><span class="card-caret">\u25B6</span></div>
       ${b.ai_summary?`<div class="card-preview">${preview2(b.ai_summary)}</div>`:''}
-      <div class="card-body" onclick="event.stopPropagation()">${bookBodyHTML(b)}</div>
+      <div class="card-body" onclick="event.stopPropagation()">${bookBodyHTML(b,bucketIds)}</div>
       <div class="card-actions" onclick="event.stopPropagation()">${b.status!=='summarized'?`<button class="act primary" onclick="summarizeBook('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Laat Dain analyseren</button>`:`<button class="act" onclick="summarizeBook('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Opnieuw analyseren</button>`}</div></article>`;
   }
 
@@ -1378,7 +1425,10 @@
     renderRecBucketBar();
     let q=sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, visual_report_html, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)').neq('status','deleted').order('created_at',{ascending:false});
     if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
-    if(activeRecBucket!=='all') q=q.eq('bucket_id',activeRecBucket);
+    if(activeRecBucket!=='all'){
+      const ids=await itemIdsForBucket('recording_bucket_links','recording_id',activeRecBucket);
+      q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
+    }
     const { data:recs, error }=await q;
     if(error){ conn.textContent='fout'; feed.innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
     conn.textContent=`\u25CF ${recs.length} opname${recs.length===1?'':'s'}`;
@@ -1480,10 +1530,24 @@
     editTimers[id]=setTimeout(async()=>{
       const c=serializeNoteContent(ci).trim();
       if(!c){ if(st){ st.className='save-status'; st.textContent='Notitie mag niet leeg zijn'; } return; }
+      const hadNoTitle=!ti.value.trim();
       const { error }=await sb.from('notes').update({ title:ti.value.trim()||null, content:c }).eq('id',id);
       if(st){ st.className='save-status saved'; st.textContent=error?'':'Opgeslagen \u2713'; }
-      if(!error){ embedContent('notes',id); loadNotesIndex(); }
+      if(!error){
+        embedContent('notes',id); loadNotesIndex();
+        if(hadNoTitle && c.length>15) autoTitleNote(id,ti,c);
+      }
     },900);
+  }
+  // Genereert automatisch een titel op basis van de inhoud, zolang je zelf nog niks hebt ingevuld
+  async function autoTitleNote(id,titleInput,content){
+    try{
+      const { data, error }=await sb.functions.invoke('generate-title',{ body:{ text:content } });
+      if(error||!data?.title) return;
+      if(titleInput.value.trim()) return; // jij was ondertussen zelf al aan het typen \u2014 dan raken we dat niet aan
+      titleInput.value=data.title;
+      await sb.from('notes').update({ title:data.title }).eq('id',id);
+    }catch(_e){ /* stille fallback: gewoon 'Naamloze notitie' laten staan */ }
   }
   // Plak een afbeelding rechtstreeks tussen de tekst: verschijnt meteen op de cursorpositie, tekst plakt gewoon als platte tekst
   function handleNotePaste(event,id){
@@ -1528,6 +1592,7 @@
     }
     setStatus('saved');
     embedContent('notes',composerNoteId);
+    if(!title && content.length>15) autoTitleNote(composerNoteId,$('noteTitle'),content);
   }
   function scheduleAutoSave(){
     setStatus('saving');
@@ -2072,19 +2137,30 @@
     $('mapCanvasWrap').classList.add('hidden');
     if(!mmBuckets.length) await loadMmBuckets(); else renderMmBucketBar();
     let q=sb.from('mindmaps').select('*').neq('status','deleted').order('updated_at',{ascending:false});
-    if(activeMmBucket!=='all') q=q.eq('bucket_id',activeMmBucket);
+    if(activeMmBucket!=='all'){
+      const ids=await itemIdsForBucket('mindmap_bucket_links','mindmap_id',activeMmBucket);
+      q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
+    }
     const { data:maps, error }=await q;
     if(error){ $('mapCards').innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
     conn.textContent=`\u25CF ${maps.length} mindmap${maps.length===1?'':'s'}`;
     if(!maps.length){ $('mapCards').innerHTML=`<div class="empty"><div class="big">Nog geen mindmaps</div><p>${activeMmBucket==='all'?'Maak hierboven je eerste mindmap.':'Deze bucket is nog leeg.'}</p></div>`; return; }
+    const bkByMap=await loadBucketLinksFor('mindmap_bucket_links','mindmap_id',maps.map(m=>m.id));
     $('mapCards').innerHTML=maps.map(m=>{
       const when=new Date(m.updated_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
-      const bkPick=`<select onchange="event.stopPropagation();setMapBucket('${m.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${mmBucketOptions(m.bucket_id)}</select>`;
+      const bkPick=bucketChipHTML(bkByMap[m.id]||[],mmBuckets,`openMmBucketPicker('${m.id}')`);
       return `<article class="card open" style="cursor:pointer;" onclick="openMap('${m.id}','${escJs(m.title)}')">
         <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(m.title)}</div><div class="card-meta">Laatst bewerkt ${when}</div></div>${starHTML('mindmaps',m.id,m.favorite)}${delChipHTML(`askDeleteMindmap('${m.id}',this)`)}<span class="pill summarized">mindmap</span></div>
         <div class="card-actions" onclick="event.stopPropagation()">${bkPick}</div>
       </article>`;
     }).join('');
+  }
+  async function openMmBucketPicker(id){
+    const current=(await loadBucketLinksFor('mindmap_bucket_links','mindmap_id',[id]))[id]||[];
+    openBucketPicker('\u{1F5C2} Buckets kiezen',mmBuckets,current,async(checked)=>{
+      await setBucketLinks('mindmap_bucket_links','mindmap_id',id,checked);
+      loadMaps();
+    });
   }
 
   $('mapCreateBtn').addEventListener('click',async()=>{
@@ -2797,7 +2873,8 @@
     function tlSessionContentHTML(s){
       const secRows=(s.summaries||[]).filter(x=>x.kind==='section').sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));
       const summary=(s.summaries||[]).find(x=>x.kind==='summary')?.content;
-      const insights=(s.summaries||[]).find(x=>x.kind==='coaching_insights')?.content;
+      const insightsRow=(s.summaries||[]).find(x=>x.kind==='coaching_insights');
+      const insights=insightsRow?.content;
       const acties=(s.action_items||[]);
       const hasTx=(s.transcripts||[]).length>0;
       let out='';
@@ -2808,7 +2885,7 @@
       } else {
         out+=`<div class="tl-empty-line">Nog niet samengevat.</div>`;
       }
-      if(insights) out+=`<div class="section-label"><span>Inzicht</span></div><div class="text-block">${linkifyWiki(insights.length>300?insights.slice(0,300)+'\u2026':insights)}</div>`;
+      if(insights) out+=`<div class="section-label"><span>${esc(insightsRow.title||'Inzichten')}</span></div><div class="text-block">${linkifyWiki(insights.length>300?insights.slice(0,300)+'\u2026':insights)}</div>`;
       if(acties.length) out+=`<div class="section-label"><span>Acties</span></div><ul class="actions">${acties.map(a=>`<li>${esc(a.content)}</li>`).join('')}</ul>`;
       let tlBtns='';
       if(!hasTx && (s.status==='uploaded'||s.status==='failed')) tlBtns+=`<button class="act" onclick="startTranscribe('${s.id}',this)">${mi(COL.rec,ICO.play)}Start transcriptie</button>`;
@@ -2916,7 +2993,8 @@
   // ================= BOEKEN =================
   function mdLiteBook(t){ return wikiLinksInEscaped(esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')); }
 
-  function bookBodyHTML(b){
+  function bookBodyHTML(b,bucketIds){
+    bucketIds=bucketIds||[];
     let body='';
     const sec=(label,txt,cls)=>{ if(!txt) return ''; return `<div class="section-label"><span>${label}</span></div><div class="${cls||'bk-ai'}">${mdLiteBook(txt)}</div>`; };
     if(b.ai_summary){
@@ -2937,20 +3015,31 @@
       </div>`;
     const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,id)=>id===b.notebook_id?`value="${id}" selected`:m);
     const nbPick=`<select onchange="setBookNotebook('${b.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select>`;
-    const bkPick=`<select onchange="event.stopPropagation();setBookBucket('${b.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${bookBucketOptions(b.bucket_id)}</select>`;
+    const bkPick=bucketChipHTML(bucketIds,bookBuckets,`openBookBucketPicker('${b.id}')`);
     body+=`<div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${nbPick} ${bkPick}</div>`;
     return body;
+  }
+  async function openBookBucketPicker(id){
+    const current=(await loadBucketLinksFor('book_bucket_links','book_id',[id]))[id]||[];
+    openBucketPicker('\u{1F5C2} Buckets kiezen',bookBuckets,current,async(checked)=>{
+      await setBucketLinks('book_bucket_links','book_id',id,checked);
+      loadBooks();
+    });
   }
 
   async function loadBooks(){
     if(!bookBuckets.length) await loadBookBuckets(); else renderBookBucketBar();
     let q=sb.from('book_summaries').select('*').order('created_at',{ascending:false});
-    if(activeBookBucket!=='all') q=q.eq('bucket_id',activeBookBucket);
+    if(activeBookBucket!=='all'){
+      const ids=await itemIdsForBucket('book_bucket_links','book_id',activeBookBucket);
+      q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
+    }
     const { data:books, error }=await q;
     if(error){ $('bkCards').innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
     conn.textContent=`\u25CF ${books.length} boek${books.length===1?'':'en'}`;
     if(!books.length){ $('bkCards').innerHTML=`<div class="empty"><div class="big">Nog geen boeken</div><p>Voeg hierboven je eerste boek toe.</p></div>`; return; }
-    $('bkCards').innerHTML=books.map(bookCardHTML).join('');
+    const bkByBook=await loadBucketLinksFor('book_bucket_links','book_id',books.map(b=>b.id));
+    $('bkCards').innerHTML=books.map(b=>bookCardHTML(b,bkByBook[b.id])).join('');
   }
 
   $('bkCreateBtn').addEventListener('click',async()=>{
@@ -3203,7 +3292,8 @@
   // embeddings (afgeleide zoekindex, is zo weer opgebouwd via 'Herindexeer').
   const BACKUP_TABLES=['notebooks','recordings','transcripts','summaries','action_items','notes',
     'coachees','recording_coachees','mindmaps','mindmap_nodes','book_summaries','templates','documents',
-    'inspiration','inspiration_buckets','mindmap_buckets','recording_buckets','note_buckets','appointments','attachments','book_buckets'];
+    'inspiration','inspiration_buckets','mindmap_buckets','recording_buckets','note_buckets','appointments','attachments','book_buckets',
+    'note_bucket_links','recording_bucket_links','book_bucket_links','inspiration_bucket_links','mindmap_bucket_links'];
   async function exportBackup(btn){
     const original=btn.innerHTML; btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Verzamelen\u2026';
     try{
@@ -3341,8 +3431,19 @@
       </div>`;
     }
     else if(id==='actions'){
-      const sorted=sortActions(dashData.actions).slice(0,8);
-      const rows=sorted.length?sorted.map(a=>actionRowHTML(a)).join(''):'<div class="db-empty">Geen acties \u2014 lekker bezig \u2728</div>';
+      const sorted=sortActions(dashData.actions);
+      const open=sorted.filter(a=>!a.done);
+      const done=sorted.filter(a=>a.done);
+      let rows='';
+      rows+=open.slice(0,3).map(a=>actionRowHTML(a)).join('');
+      const restOpen=open.slice(3);
+      if(restOpen.length){
+        rows+=`<div class="section-label transcript-toggle" onclick="toggleDashFold('moreActions')" style="cursor:pointer;margin-top:6px;"><span>+${restOpen.length} meer <span id="moreActionsCaret">\u25B8</span></span></div><div id="moreActionsBox" class="hidden">${restOpen.map(a=>actionRowHTML(a)).join('')}</div>`;
+      }
+      if(done.length){
+        rows+=`<div class="section-label transcript-toggle" onclick="toggleDashFold('doneActions')" style="cursor:pointer;margin-top:10px;"><span>Voltooid (${done.length}) <span id="doneActionsCaret">\u25B8</span></span></div><div id="doneActionsBox" class="hidden">${done.map(a=>actionRowHTML(a)).join('')}</div>`;
+      }
+      if(!open.length && !done.length) rows='<div class="db-empty">Geen acties \u2014 lekker bezig \u2728</div>';
       inner=`<div class="db-title">Acties</div>${rows}`;
     }
     else if(id==='duesoon'){
@@ -3573,10 +3674,12 @@
   async function openRecLinks(id,nbId,coId,bkId,apptId){
     const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,vid)=>vid===nbId?`value="${vid}" selected`:m);
     const coachOpts=`<option value="">\u2014 koppel coachee \u2014</option>`+coachees.map(c=>`<option value="${c.id}" ${c.id===coId?'selected':''}>${esc(c.name)}</option>`).join('');
+    if(!recBuckets.length) await loadRecBuckets();
+    const currentBk=(await loadBucketLinksFor('recording_bucket_links','recording_id',[id]))[id]||[];
     const body=`
       <label>Notitieboek</label><select id="rlNb">${nbOpts}</select>
       <label>Coachee</label><select id="rlCo">${coachOpts}</select>
-      <label>Bucket</label><select id="rlBk">${recBucketOptions(bkId)}</select>
+      <label>Buckets</label><div>${bucketChipHTML(currentBk,recBuckets,`openRecBucketPicker('${id}')`)}</div>
       <label>Afspraak <span style="color:var(--ink-faint);font-weight:400;">(los opgenomen? koppel 'm hier alsnog aan een gesprek)</span></label><select id="rlAppt">${await apptOptionsFor(coId,apptId)}</select>
       <div class="sheet-actions"><button class="act primary" id="rlDone" style="margin-left:auto;">Klaar</button></div>`;
     openSheet('\u{1F517} Koppelen', body, (ov,close)=>{
@@ -3586,9 +3689,15 @@
         setCoachee(id,newCo);
         $('rlAppt').innerHTML=await apptOptionsFor(newCo,null); // andere coachee = andere agenda, koppeling vervalt
       };
-      $('rlBk').onchange=()=>setRecBucket(id,$('rlBk').value);
       $('rlAppt').onchange=()=>setRecAppointment(id,$('rlAppt').value);
       $('rlDone').onclick=()=>{ close(); load(); };
+    });
+  }
+  async function openRecBucketPicker(id){
+    const current=(await loadBucketLinksFor('recording_bucket_links','recording_id',[id]))[id]||[];
+    openBucketPicker('\u{1F5C2} Buckets kiezen',recBuckets,current,async(checked)=>{
+      await setBucketLinks('recording_bucket_links','recording_id',id,checked);
+      load();
     });
   }
   // ================= VISUEEL VERSLAG (Dain tekent een opgemaakt HTML-verslag) =================
@@ -4142,13 +4251,17 @@
     grid.innerHTML='<div class="empty"><div class="big">Laden\u2026</div></div>';
     let q=sb.from('inspiration').select('*').order('created_at',{ascending:false});
     if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
-    if(activeBucket!=='all') q=q.eq('bucket_id',activeBucket);
+    if(activeBucket!=='all'){
+      const ids=await itemIdsForBucket('inspiration_bucket_links','inspiration_id',activeBucket);
+      q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
+    }
     const { data:items,error }=await q;
     if(error){ grid.innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
     inspItems=items;
     conn.textContent=`\u25CF ${items.length} vonk${items.length===1?'':'en'}`;
     if(!items.length){ grid.innerHTML=`<div class="empty"><div class="big">Nog leeg</div><p>${activeBucket==='all'?'Plak een link, sleep een screenshot of upload een foto om te beginnen.':'Deze bucket is nog leeg. Koppel er vonken aan via het potloodje op een kaart.'}</p></div>`; return; }
     const attByInsp=await loadAttachmentsFor('inspiration',items.map(i=>i.id));
+    const bkByInsp=await loadBucketLinksFor('inspiration_bucket_links','inspiration_id',items.map(i=>i.id));
     const cards=await Promise.all(items.map(async i=>{
       let media='';
       if(i.kind==='image' && i.image_path){
@@ -4162,14 +4275,17 @@
       if(i.title) bodyInner+=`<div class="ic-title">${esc(i.title)}</div>`;
       if(i.content) bodyInner+=`<div class="ic-note">${esc(i.content)}</div>`;
       if(i.url && i.kind!=='video') bodyInner+=`<a class="ic-link" href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.url)}</a>`;
-      const bk=inspBuckets.find(x=>x.id===i.bucket_id);
-      if(bk) bodyInner+=`<span class="ic-bucket" style="background:${bk.color}">${esc(bk.name)}</span>`;
+      (bkByInsp[i.id]||[]).forEach(bid=>{
+        const bk=inspBuckets.find(x=>x.id===bid);
+        if(bk) bodyInner+=`<span class="ic-bucket" style="background:${bk.color}">${esc(bk.name)}</span>`;
+      });
       bodyInner+=attachmentsBlockHTML(attByInsp[i.id]);
       const bodyBlock=bodyInner?`<div class="ic-body">${bodyInner}</div>`:'';
       return `<div class="insp-card">
         <div class="ic-tools">
           <button class="${i.favorite?'fav-on':''}" title="Favoriet" onclick="toggleInspFav('${i.id}',this)">${i.favorite?'\u2605':'\u2606'}</button>
           <button title="Bijlage toevoegen" onclick="pickAttachment('inspiration','${i.id}')">\u{1F4CE}</button>
+          <button title="Buckets" onclick="openInspBucketPicker('${i.id}')">\u{1F5C2}</button>
           <button title="Bewerken" onclick="editInsp('${i.id}')">\u270E</button>
           <button title="Verwijderen" onclick="delInsp('${i.id}','${i.image_path||''}')">\u{1F5D1}</button>
         </div>
@@ -4178,6 +4294,13 @@
     }));
     grid.innerHTML=cards.join('');
     initPendingPdfViewers();
+  }
+  async function openInspBucketPicker(id){
+    const current=(await loadBucketLinksFor('inspiration_bucket_links','inspiration_id',[id]))[id]||[];
+    openBucketPicker('\u{1F5C2} Buckets kiezen',inspBuckets,current,async(checked)=>{
+      await setBucketLinks('inspiration_bucket_links','inspiration_id',id,checked);
+      loadInspiration();
+    });
   }
 
   function openInspLink(){
@@ -4209,10 +4332,20 @@
       $('inSave').onclick=async()=>{
         const txt=$('inTxt').value.trim(); if(!txt){ alert('Schrijf iets.'); return; }
         const { data:{ user } }=await sb.auth.getUser();
-        await sb.from('inspiration').insert({ user_id:user.id, kind:'note', title:$('inTitle').value.trim()||null, content:txt, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:$('inBucket').value||null });
+        const titleInput=$('inTitle').value.trim();
+        const { data:row }=await sb.from('inspiration').insert({ user_id:user.id, kind:'note', title:titleInput||null, content:txt, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:$('inBucket').value||null }).select().single();
         close(); loadInspiration();
+        if(!titleInput && row && txt.length>15) autoTitleInspiration(row.id,txt);
       };
     });
+  }
+  async function autoTitleInspiration(id,content){
+    try{
+      const { data, error }=await sb.functions.invoke('generate-title',{ body:{ text:content } });
+      if(error||!data?.title) return;
+      await sb.from('inspiration').update({ title:data.title }).eq('id',id);
+      loadInspiration();
+    }catch(_e){ /* stille fallback */ }
   }
   async function uploadInspImage(file){
     if(!file || !file.type.startsWith('image/')) return;
@@ -4252,7 +4385,7 @@
       if(handled) loadInspiration();
     });
   })();
-  function editInsp(id){
+  async function editInsp(id){
     const i=inspItems.find(x=>x.id===id); if(!i) return;
     let fields='';
     if(i.kind==='link'||i.kind==='video'){
@@ -4270,14 +4403,15 @@
         <label>Notitie</label><textarea id="eiNote" placeholder="Waarom bewaar je dit beeld?">${esc(i.content||'')}</textarea>`;
     }
     const nbOpts=`<option value="">Geen notitieboek</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,nid)=>nid===i.notebook_id?`value="${nid}" selected`:m);
+    const currentBk=(await loadBucketLinksFor('inspiration_bucket_links','inspiration_id',[id]))[id]||[];
     const body=`${fields}
       <label>Notitieboek</label><select id="eiNb">${nbOpts}</select>
-      <label>Bucket</label><select id="eiBucket">${bucketOptions(i.bucket_id)}</select>
+      <label>Buckets</label><div>${bucketChipHTML(currentBk,inspBuckets,`openInspBucketPicker('${id}')`)}</div>
       <div class="sheet-actions"><button class="act" id="eiCancel">Annuleren</button><button class="act primary" id="eiSave">Opslaan</button></div>`;
     openSheet('\u270E Vonk bewerken', body, (ov,close)=>{
       $('eiCancel').onclick=close;
       $('eiSave').onclick=async()=>{
-        const patch={ notebook_id:$('eiNb').value||null, bucket_id:$('eiBucket').value||null };
+        const patch={ notebook_id:$('eiNb').value||null };
         if($('eiTitle')) patch.title=$('eiTitle').value.trim()||null;
         if($('eiNote')) patch.content=$('eiNote').value.trim()||null;
         if($('eiUrl')){ const u=$('eiUrl').value.trim(); patch.url=u||null; patch.kind=(ytEmbed(u)||vimeoEmbed(u))?'video':'link'; }
@@ -4316,11 +4450,22 @@
     if(!noteBuckets.length) await loadNoteBuckets(); else renderNoteBucketBar();
     let q=sb.from('notes').select('*').is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false});
     if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
-    if(activeNoteBucket!=='all') q=q.eq('bucket_id',activeNoteBucket);
+    if(activeNoteBucket!=='all'){
+      const ids=await itemIdsForBucket('note_bucket_links','note_id',activeNoteBucket);
+      q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
+    }
     const { data:notes }=await q;
     const attByNote=await loadAttachmentsFor('note',(notes||[]).map(n=>n.id));
-    fn.innerHTML=(notes||[]).map(n=>noteCardHTML(n,attByNote[n.id])).join('');
+    const bkByNote=await loadBucketLinksFor('note_bucket_links','note_id',(notes||[]).map(n=>n.id));
+    fn.innerHTML=(notes||[]).map(n=>noteCardHTML(n,attByNote[n.id],bkByNote[n.id])).join('');
     initPendingPdfViewers();
+  }
+  async function openNoteBucketPicker(id){
+    const current=(await loadBucketLinksFor('note_bucket_links','note_id',[id]))[id]||[];
+    openBucketPicker('\u{1F5C2} Buckets kiezen',noteBuckets,current,async(checked)=>{
+      await setBucketLinks('note_bucket_links','note_id',id,checked);
+      loadNoteFeed();
+    });
   }
 
   // ============================================================
