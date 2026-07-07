@@ -316,7 +316,7 @@
   ul.actions li { padding:9px 0 9px 28px; position:relative; color:var(--ink); border-bottom:1px solid var(--line); font-size:14.5px; }
   ul.actions li:last-child { border-bottom:none; }
   ul.actions li::before { content:''; position:absolute; left:4px; top:15px; width:13px; height:13px; border-radius:50%; background:var(--grad-purple); }
-  .card-actions { display:flex; gap:10px; flex-wrap:wrap; padding:4px 22px 20px; }
+  .card-actions { display:flex; gap:10px; flex-wrap:wrap; padding:14px 22px 20px; }
   button.act { font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; border:1.5px solid var(--line); color:var(--ink-soft); background:#fff; padding:10px 18px; border-radius:11px; transition:all .15s ease; display:inline-flex; align-items:center; gap:8px; }
   button.act:hover { border-color:var(--purple); color:var(--purple); }
   button.act:disabled { opacity:.5; cursor:default; }
@@ -489,6 +489,23 @@
   /* Coachee detail-knoppen */
   .co-detailbtns { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
   .badge-fav { display:inline-block; font-size:11px; font-weight:700; color:#b8860b; background:#fff7db; padding:2px 8px; border-radius:10px; }
+/* ===== Toasts ===== */
+#toastWrap{position:fixed;top:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+.toast{pointer-events:auto;background:#292727;color:#fff;border-radius:12px;padding:11px 16px;font-size:13.5px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.18);display:flex;align-items:center;gap:9px;max-width:340px;animation:toastIn .25s ease;}
+.toast.ok{border-left:4px solid #549E39;}
+.toast.err{border-left:4px solid #e5484d;}
+.toast.out{opacity:0;transform:translateX(12px);transition:all .3s ease;}
+@keyframes toastIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
+/* ===== Command palette ===== */
+#cmdkOverlay{position:fixed;inset:0;background:rgba(20,20,25,.35);backdrop-filter:blur(3px);z-index:9998;display:none;align-items:flex-start;justify-content:center;padding-top:12vh;}
+#cmdkOverlay.open{display:flex;}
+#cmdkBox{background:#fff;border-radius:16px;width:min(560px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;}
+#cmdkInput{width:100%;border:none;outline:none;padding:16px 18px;font-size:16px;font-family:inherit;border-bottom:1.5px solid var(--line);}
+#cmdkList{max-height:50vh;overflow-y:auto;padding:6px;}
+.cmdk-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:14px;}
+.cmdk-item.sel,.cmdk-item:hover{background:#f2f0ff;}
+.cmdk-item .ck-meta{margin-left:auto;font-size:11.5px;color:var(--ink-faint);}
+.cmdk-label{font-size:11px;font-weight:600;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.4px;padding:8px 12px 2px;}
 </style>
 </head>
 <body>
@@ -534,7 +551,8 @@
 
     <!-- Zoekresultaten -->
     <div id="paneSearch" class="hidden">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;">
+        <button class="act" onclick="openKnowledgeGraph()" title="Bekijk hoe je notities, coachees en idee&euml;n met elkaar verbonden zijn" style="display:inline-flex;align-items:center;gap:8px;">&#128376;&#65039; Kennisgraaf</button>
         <button class="act" id="reindexBtn" onclick="reindexEmbeddings(this)" title="Laat Dain je opnames, notities en boeken opnieuw doorgronden voor slimmer zoeken" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14.6-4.6"/><path d="M20 12a8 8 0 0 1-14.6 4.6"/><path d="M18 4v4h-4"/><path d="M6 20v-4h4"/></svg></span>Herindexeer voor Dain-zoeken</button>
       </div>
       <div id="searchResults" class="feed"></div>
@@ -625,7 +643,11 @@
           <button data-mode="science" onclick="setSpar('science',this)">&#128300; Wetenschap</button>
           <button data-mode="patterns" onclick="setSpar('patterns',this)">&#128101; Patronen</button>
         </div>
-        <button class="act" id="scopeBtn" onclick="openScope()">&#127760; Heel brein</button>
+        <div style="display:flex;gap:8px;">
+          <button class="act" id="chatNewBtn" onclick="newChat()" title="Nieuw gesprek">&#10024; Nieuw</button>
+          <button class="act" id="chatHistBtn" onclick="openChatHistory()" title="Eerdere gesprekken">&#128336; Gesprekken</button>
+          <button class="act" id="scopeBtn" onclick="openScope()">&#127760; Heel brein</button>
+        </div>
       </div>
       <div class="chat-box">
         <div id="chatLog" class="chat-log">
@@ -743,6 +765,18 @@
   const SUPABASE_URL='https://stsmbpgtdtzscpswbwww.supabase.co';
   const SUPABASE_KEY='sb_publishable_pfjTF-UQP0juprQ0lHPodA_bgUBFDZ9';
   const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+  // ================= TOASTS (vervangt alert) =================
+  function toast(msg,type){
+    let wrap=document.getElementById('toastWrap');
+    if(!wrap){ wrap=document.createElement('div'); wrap.id='toastWrap'; document.body.appendChild(wrap); }
+    const t=document.createElement('div');
+    const kind=type||(/fout|mis|kon niet|error|mislukt|niet gelukt/i.test(msg)?'err':'ok');
+    t.className='toast '+kind;
+    t.textContent=(kind==='err'?'\u26A0\uFE0F ':'\u2713 ')+msg;
+    wrap.appendChild(t);
+    setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(),350); },4200);
+  }
   // ================= GOOGLE AGENDA-KOPPELING =================
   const GOOGLE_CLIENT_ID='945460576637-lnf92190ih75qt305dhdaaeagq08c39e.apps.googleusercontent.com';
   const GOOGLE_REDIRECT_URI='https://uplab-nl.github.io/2nd-brain/';
@@ -774,9 +808,9 @@
       const { data, error }=await sb.functions.invoke('google-oauth-callback',{ body:{ code, redirect_uri:GOOGLE_REDIRECT_URI } });
       if(error||data?.error) throw new Error(data?.error||error.message);
       await refreshGoogleStatusUI();
-      alert('Google Agenda gekoppeld. Afspraken kunnen er nu automatisch in.');
+      toast('Google Agenda gekoppeld. Afspraken kunnen er nu automatisch in.');
     }catch(e){
-      alert('Koppelen mislukt: '+e.message);
+      toast('Koppelen mislukt: '+e.message);
     }
   }
   if('serviceWorker' in navigator){
@@ -831,7 +865,7 @@
     if(!confirm(`Nog geen notitie of coachee genaamd "${name}" \u2014 nu aanmaken als nieuwe notitie?`)) return;
     const { data:{ user } }=await sb.auth.getUser();
     const { data, error }=await sb.from('notes').insert({ user_id:user.id, title:name, content:'' }).select().single();
-    if(error){ alert('Kon notitie niet maken: '+error.message); return; }
+    if(error){ toast('Kon notitie niet maken: '+error.message); return; }
     await loadNotesIndex();
     embedContent('notes',data.id);
     activeNB='all'; renderTree();
@@ -943,9 +977,9 @@
   async function playAudio(recId,btn){
     btn.disabled=true; const orig=btn.innerHTML; btn.innerHTML='\u2026';
     const { data:rec }=await sb.from('recordings').select('audio_path').eq('id',recId).single();
-    if(!rec?.audio_path){ alert('Geen audio gevonden.'); btn.disabled=false; btn.innerHTML=orig; return; }
+    if(!rec?.audio_path){ toast('Geen audio gevonden.'); btn.disabled=false; btn.innerHTML=orig; return; }
     const { data, error }=await sb.storage.from('Recordings').createSignedUrl(rec.audio_path,3600);
-    if(error){ alert('Kon audio niet laden: '+error.message); btn.disabled=false; btn.innerHTML=orig; return; }
+    if(error){ toast('Kon audio niet laden: '+error.message); btn.disabled=false; btn.innerHTML=orig; return; }
     const wrap=document.getElementById('audio-'+recId);
     wrap.innerHTML=`<audio controls autoplay src="${data.signedUrl}"></audio>`;
     btn.remove();
@@ -1151,7 +1185,7 @@
     if(!title) return;
     const { data:{ user } }=await sb.auth.getUser();
     const { data:map, error }=await sb.from('mindmaps').insert({ user_id:user.id, title, notebook_id:nbId }).select().single();
-    if(error){ alert('Kon mindmap niet maken: '+error.message); return; }
+    if(error){ toast('Kon mindmap niet maken: '+error.message); return; }
     await sb.from('mindmap_nodes').insert({ mindmap_id:map.id, user_id:user.id, label:title, x:0, y:0, color:'#8a5cff' });
     openMap(map.id,title);
   }
@@ -1162,7 +1196,7 @@
     const { data:{ user } }=await sb.auth.getUser();
     const color=NB_COLORS[notebooks.length % NB_COLORS.length];
     const { error }=await sb.from('notebooks').insert({ user_id:user.id, name:name, color, parent_id:parentId||null });
-    if(error){ alert('Kon notitieboek niet maken: '+error.message); return; }
+    if(error){ toast('Kon notitieboek niet maken: '+error.message); return; }
     if(parentId){ nbOpen[parentId]=true; saveOpen(); }
     await loadNotebooks();
   }
@@ -1172,7 +1206,7 @@
     const name=await promptModal('Nieuwe naam',nb.name);
     if(!name||name===nb.name) return;
     const { error }=await sb.from('notebooks').update({ name:name }).eq('id',id);
-    if(error){ alert('Kon niet hernoemen: '+error.message); return; }
+    if(error){ toast('Kon niet hernoemen: '+error.message); return; }
     await loadNotebooks();
   }
 
@@ -1181,7 +1215,7 @@
   async function toggleArchive(id){
     const nb=nbById(id); if(!nb) return;
     const { error }=await sb.from('notebooks').update({ archived:!nb.archived }).eq('id',id);
-    if(error){ alert('Kon niet archiveren: '+error.message); return; }
+    if(error){ toast('Kon niet archiveren: '+error.message); return; }
     if(activeNB===id) activeNB='all';
     await loadNotebooks(); load();
   }
@@ -1215,7 +1249,7 @@
     }
     // Notitieboek zelf verwijderen (submappen gaan via cascade mee)
     const { error }=await sb.from('notebooks').delete().eq('id',id);
-    if(error){ alert('Kon niet verwijderen: '+error.message); return; }
+    if(error){ toast('Kon niet verwijderen: '+error.message); return; }
     if(activeNB===id||ids.includes(activeNB)) activeNB='all';
     await loadNotebooks(); load();
   }
@@ -1238,9 +1272,9 @@
         headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${session?.access_token||SUPABASE_KEY}` },
         body:JSON.stringify({ recording_id }) });
       const data=await res.json();
-      if(data.error){ alert('Er ging iets mis: '+data.error); btn.disabled=false; btn.textContent=original; return; }
+      if(data.error){ toast('Er ging iets mis: '+data.error); btn.disabled=false; btn.textContent=original; return; }
       await load();
-    }catch(e){ alert('Verbindingsfout: '+e.message); btn.disabled=false; btn.textContent=original; }
+    }catch(e){ toast('Verbindingsfout: '+e.message); btn.disabled=false; btn.textContent=original; }
   }
 
   // ---- Feed ----
@@ -1343,8 +1377,10 @@
     if(r.status==='transcribed'||r.status==='summarized'){
       btns+=tplPick+`<button class="act primary" onclick="summarizeWithTpl('${r.id}',this)">${mi(COL.dain,ICO.sparkle)}${r.status==='summarized'?'Opnieuw samenvatten':'Laat Dain samenvatten'}</button>`;
     }
-    if(hasTranscript) btns+=`<button class="act" onclick="openVisualReport('${r.id}')">${mi(COL.green,ICO.palette)}Visueel verslag${r.visual_report_html?'':' maken'}</button>`;
+    if(hasTranscript) btns+=`<button class="act" onclick="openVisualReport('${r.id}')">${mi(COL.green,ICO.palette)}Visueel verslag${vrIds.has(r.id)?'':' maken'}</button>`;
     btns+=`<button class="act" onclick="openRecLinks('${r.id}','${r.notebook_id||''}','${r.coachee_id||''}','${r.bucket_id||''}','${r.appointment_id||''}')">${mi(COL.neutral,ICO.link)}Koppelen</button>`;
+    if(hasTranscript) btns+=`<button class="act" onclick="event.stopPropagation();openRelated('recording','${r.id}')">${mi(COL.dain,ICO.link)}Gerelateerd</button>`;
+    if(r.status==='summarized') btns+=`<button class="act" onclick="event.stopPropagation();shareWithCoachee('${r.id}')">${mi(COL.green,ICO.link)}Deel met coachee</button>`;
     const nb2=nb?`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`:'';
     const tpl=templates.find(t=>t.id===r.template_id);
     const tplTag=tpl?`<span class="tpl-tag">\u25A4 ${esc(tpl.name)}</span>`:'';
@@ -1381,9 +1417,9 @@
     const co=coachees.find(c=>c.id===n.coachee_id);
     const coTag=co?`<span class="co-tag">\u{1F464} ${esc(co.name)}</span>`:'';
     const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,id)=>id===n.notebook_id?`value="${id}" selected`:m);
-    const nbPick=`<select onchange="setNoteNotebook('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select>`;
+    const nbPick=`<select onchange="setNoteNotebook('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11.5px;padding:5px 9px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select>`;
     const coachOpts=`<option value="">\u2014 koppel coachee \u2014</option>`+coachees.map(cc=>`<option value="${cc.id}" ${cc.id===n.coachee_id?'selected':''}>${esc(cc.name)}</option>`).join('');
-    const coachPick=`<select onchange="setNoteCoachee('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${coachOpts}</select>`;
+    const coachPick=`<select onchange="setNoteCoachee('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11.5px;padding:5px 9px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${coachOpts}</select>`;
     const bkPick=bucketChipHTML(bucketIds,noteBuckets,`event.stopPropagation();openNoteBucketPicker('${n.id}')`);
     const prev=preview2(n.content||'');
     const thumb=atts.find(a=>a.kind==='image');
@@ -1399,10 +1435,11 @@
         <div class="note-inline-content" id="ninlc-${n.id}" contenteditable="true" data-placeholder="Schrijf hier je gedachte\u2026 (plak gerust een afbeelding)" oninput="scheduleNoteSave('${n.id}')" onpaste="handleNotePaste(event,'${n.id}')">${renderNoteContentHTML(n.content,atts)}</div>
         <span class="save-status" id="nstat-${n.id}"></span>
         <div id="noteatt-${n.id}">${attachmentsBlockHTML(looseAtts)}</div>
-        <div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${nbPick} ${coachPick} ${bkPick}</div>
+        <div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;">${nbPick} ${coachPick} ${bkPick}</div>
       </div>
       <div class="card-actions" onclick="event.stopPropagation()">
         <button class="act" onclick="pickAttachment('note','${n.id}')">${mi(COL.note,ICO.clip)}Bijlage</button>
+        <button class="act" onclick="openRelated('note','${n.id}')">${mi(COL.dain,ICO.link)}Gerelateerd</button>
       </div></article>`;
   }
 
@@ -1421,31 +1458,44 @@
       <div class="card-actions" onclick="event.stopPropagation()">${b.status!=='summarized'?`<button class="act primary" onclick="summarizeBook('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Laat Dain analyseren</button>`:`<button class="act" onclick="summarizeBook('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Opnieuw analyseren</button>`}</div></article>`;
   }
 
+  let vrIds=new Set();
+  async function refreshVrIds(){
+    try{ const { data }=await sb.from('recordings').select('id').not('visual_report_html','is',null); vrIds=new Set((data||[]).map(r=>r.id)); }catch(e){}
+  }
+  let recLimit=50;
   async function loadRecordings(){
     renderRecBucketBar();
-    let q=sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, visual_report_html, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)').neq('status','deleted').order('created_at',{ascending:false});
+    await refreshVrIds();
+    let q=sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)',{count:'exact'}).neq('status','deleted').order('created_at',{ascending:false}).limit(recLimit);
     if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
     if(activeRecBucket!=='all'){
       const ids=await itemIdsForBucket('recording_bucket_links','recording_id',activeRecBucket);
       q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
     }
-    const { data:recs, error }=await q;
+    const { data:recs, error, count }=await q;
     if(error){ conn.textContent='fout'; feed.innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
-    conn.textContent=`\u25CF ${recs.length} opname${recs.length===1?'':'s'}`;
+    conn.textContent=`\u25CF ${count??recs.length} opname${(count??recs.length)===1?'':'s'}`;
     if(!recs.length){ feed.innerHTML=`<div class="empty"><div class="big">Nog geen opnames</div><p>${activeRecBucket==='all'?'Upload hierboven een audiobestand om te beginnen.':'Deze bucket is nog leeg.'}</p></div>`; return; }
-    feed.innerHTML=recs.map(recCardHTML).join('');
+    feed.innerHTML=recs.map(recCardHTML).join('')+loadMoreHTML('recLimit+=50;loadRecordings()',recs.length,count);
   }
 
+  // "Laad meer"-knop voor gepagineerde feeds
+  function loadMoreHTML(js,shown,total){
+    if(!total||total<=shown) return '';
+    return `<div style="text-align:center;margin:16px 0 6px;"><button class="act" onclick="${js}">\u2B07 Laad meer (${shown} van ${total})</button></div>`;
+  }
+
+  let noteLimit=50;
   async function loadNotes(){
     if(typeof resetComposer==="function") resetComposer();
-    let q=sb.from('notes').select('*').is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false});
+    let q=sb.from('notes').select('*',{count:'exact'}).is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false}).limit(noteLimit);
     if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
-    const { data:notes, error }=await q;
+    const { data:notes, error, count }=await q;
     if(error){ conn.textContent='fout'; feed.innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
-    conn.textContent=`\u25CF ${notes.length} notitie${notes.length===1?'':'s'}`;
+    conn.textContent=`\u25CF ${count??notes.length} notitie${(count??notes.length)===1?'':'s'}`;
     if(!notes.length){ feed.innerHTML=''; if($('feedNote')) $('feedNote').innerHTML=`<div class="empty"><div class="big">Nog geen notities</div><p>Schrijf hierboven je eerste losse notitie.</p></div>`; return; }
     feed.innerHTML='';
-    if($('feedNote')) $('feedNote').innerHTML=notes.map(noteCardHTML).join('');
+    if($('feedNote')) $('feedNote').innerHTML=notes.map(noteCardHTML).join('')+loadMoreHTML('noteLimit+=50;loadNoteFeed()',notes.length,count);
   }
 
   async function setNoteCoachee(id,cid){ await sb.from('notes').update({ coachee_id:cid||null }).eq('id',id); }
@@ -1465,7 +1515,7 @@
     if(!templates.length) await loadTemplateList();
     if(!inspBuckets.length) await loadBuckets();
     const [recs,notes,maps,books,coach,insp,docs]=await Promise.all([
-      sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, visual_report_html, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)').eq('favorite',true).neq('status','deleted').order('created_at',{ascending:false}),
+      sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)').eq('favorite',true).neq('status','deleted').order('created_at',{ascending:false}),
       sb.from('notes').select('*').eq('favorite',true).is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false}),
       sb.from('mindmaps').select('*').eq('favorite',true).neq('status','deleted').order('updated_at',{ascending:false}),
       sb.from('book_summaries').select('*').eq('favorite',true).order('created_at',{ascending:false}),
@@ -1756,9 +1806,9 @@
     const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
     const path=`${ownerType}/${ownerId}/${Date.now()}_${safeName}`;
     const { error:upErr }=await sb.storage.from('Attachments').upload(path,file);
-    if(upErr){ alert('Upload mislukt: '+upErr.message); return; }
+    if(upErr){ toast('Upload mislukt: '+upErr.message); return; }
     const { error:dbErr }=await sb.from('attachments').insert({ user_id:user.id, owner_type:ownerType, owner_id:ownerId, file_path:path, file_name:file.name, mime_type:file.type, kind });
-    if(dbErr){ alert('Kon bijlage niet opslaan: '+dbErr.message); }
+    if(dbErr){ toast('Kon bijlage niet opslaan: '+dbErr.message); }
   }
   // Zelfde als hierboven, maar geeft de nieuwe rij + tijdelijke link terug \u2014 nodig om 'm meteen inline te tonen
   async function uploadAttachmentFileReturning(ownerType,ownerId,file){
@@ -1767,9 +1817,9 @@
     const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
     const path=`${ownerType}/${ownerId}/${Date.now()}_${safeName}`;
     const { error:upErr }=await sb.storage.from('Attachments').upload(path,file);
-    if(upErr){ alert('Upload mislukt: '+upErr.message); return null; }
+    if(upErr){ toast('Upload mislukt: '+upErr.message); return null; }
     const { data:row, error:dbErr }=await sb.from('attachments').insert({ user_id:user.id, owner_type:ownerType, owner_id:ownerId, file_path:path, file_name:file.name, mime_type:file.type, kind }).select().single();
-    if(dbErr||!row){ alert('Kon bijlage niet opslaan: '+(dbErr?.message||'')); return null; }
+    if(dbErr||!row){ toast('Kon bijlage niet opslaan: '+(dbErr?.message||'')); return null; }
     const { data:signed }=await sb.storage.from('Attachments').createSignedUrl(path,3600);
     return { ...row, url:signed?.signedUrl||'' };
   }
@@ -1924,7 +1974,7 @@
     if(!term) return;
     const { data:{ user } }=await sb.auth.getUser();
     const { error }=await sb.from('custom_terms').insert({ user_id:user.id, term });
-    if(error && error.code!=='23505'){ alert('Kon term niet toevoegen: '+error.message); return; }
+    if(error && error.code!=='23505'){ toast('Kon term niet toevoegen: '+error.message); return; }
     input.value='';
     await loadCustomTermsForPopup();
     input.focus();
@@ -2030,8 +2080,27 @@
   // ---- Chat met Dain ----
   let chatHistory=[]; // {role, content}
   function mdLite(t){
-    // simpele markdown: **vet** -> <strong>
-    return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    // markdown-light: kopjes, lijsten, vet, cursief, code, witregels
+    const lines=esc(t).split('\n');
+    let html='', inUl=false, inOl=false;
+    const closeLists=()=>{ if(inUl){ html+='</ul>'; inUl=false; } if(inOl){ html+='</ol>'; inOl=false; } };
+    const inline=s=>s
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/(^|[\s(])\*(?!\s)([^*\n]+?)\*(?=[\s).,!?:;]|$)/g,'$1<em>$2</em>')
+      .replace(/`([^`\n]+?)`/g,'<code style="background:rgba(0,0,0,.06);border-radius:5px;padding:1px 5px;font-size:.92em;">$1</code>');
+    for(const raw of lines){
+      const line=raw.trimEnd();
+      const h=line.match(/^(#{1,4})\s+(.*)/);
+      const ul=line.match(/^[-*]\s+(.*)/);
+      const ol=line.match(/^\d+[.)]\s+(.*)/);
+      if(h){ closeLists(); const lvl=Math.min(h[1].length+2,5); html+=`<div style="font-weight:700;font-size:${lvl<=3?'15.5':'14'}px;margin:10px 0 4px;">${inline(h[2])}</div>`; }
+      else if(ul){ if(inOl){ html+='</ol>'; inOl=false; } if(!inUl){ html+='<ul style="margin:4px 0 6px 18px;padding:0;">'; inUl=true; } html+=`<li style="margin:2px 0;">${inline(ul[1])}</li>`; }
+      else if(ol){ if(inUl){ html+='</ul>'; inUl=false; } if(!inOl){ html+='<ol style="margin:4px 0 6px 18px;padding:0;">'; inOl=true; } html+=`<li style="margin:2px 0;">${inline(ol[1])}</li>`; }
+      else if(line===''){ closeLists(); html+='<div style="height:7px;"></div>'; }
+      else { closeLists(); html+=`<div>${inline(line)}</div>`; }
+    }
+    closeLists();
+    return html;
   }
   function addMsg(role,text,sources){
     const log=$('chatLog');
@@ -2064,7 +2133,7 @@
       const data=await res.json();
       thinking.remove();
       if(data.error){ addMsg('dain','Er ging iets mis: '+data.error); }
-      else { addMsg('dain',data.answer,data.sources); chatHistory.push({role:'assistant',content:data.answer}); }
+      else { addMsg('dain',data.answer,data.sources); chatHistory.push({role:'assistant',content:data.answer}); persistChat(q,data.answer,data.sources); }
     }catch(e){ thinking.remove(); addMsg('dain','Verbindingsfout: '+e.message); }
     send.disabled=false; input.focus();
   }
@@ -2167,7 +2236,7 @@
     const title=$('mapTitle').value.trim()||'Naamloze mindmap';
     const { data:{ user } }=await sb.auth.getUser();
     const { data:map, error }=await sb.from('mindmaps').insert({ user_id:user.id, title, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:activeMmBucket!=='all'?activeMmBucket:null }).select().single();
-    if(error){ alert('Kon mindmap niet maken: '+error.message); return; }
+    if(error){ toast('Kon mindmap niet maken: '+error.message); return; }
     await sb.from('mindmap_nodes').insert({ mindmap_id:map.id, user_id:user.id, label:title, x:0, y:0, color:'#8a5cff' });
     $('mapTitle').value='';
     openMap(map.id,title);
@@ -2202,7 +2271,7 @@
 
   async function loadNodes(){
     const { data, error }=await sb.from('mindmap_nodes').select('*').eq('mindmap_id',currentMap);
-    if(error){ alert('Kon knopen niet laden: '+error.message); return; }
+    if(error){ toast('Kon knopen niet laden: '+error.message); return; }
     mmNodes=data||[];
     renderMap();
   }
@@ -2604,8 +2673,8 @@
       $('mtCancel').onclick=close;
       $('mtSave').onclick=async()=>{
         const btn=$('mtSave'); const orig=btn.innerHTML;
-        const title=$('mtTitle').value.trim(); if(!title){ alert('Geef de afspraak een titel.'); return; }
-        const when=$('mtWhen').value; if(!when){ alert('Kies een datum en tijd.'); return; }
+        const title=$('mtTitle').value.trim(); if(!title){ toast('Geef de afspraak een titel.'); return; }
+        const when=$('mtWhen').value; if(!when){ toast('Kies een datum en tijd.'); return; }
         const dur=parseInt($('mtDur').value)||60;
         const start=new Date(when); const end=new Date(start.getTime()+dur*60000);
         const notes=$('mtNotes').value.trim();
@@ -2622,10 +2691,10 @@
           }
           close();
           if(!$('coTimelineView').classList.contains('hidden')) openTimeline(id);
-          if(data?.mail_error) alert('Afspraak staat in de agenda, maar de mail ging niet uit: '+data.mail_error);
+          if(data?.mail_error) toast('Afspraak staat in de agenda, maar de mail ging niet uit: '+data.mail_error);
         }catch(e){
           btn.disabled=false; btn.innerHTML=orig;
-          alert('Kon afspraak niet inplannen: '+e.message);
+          toast('Kon afspraak niet inplannen: '+e.message);
         }
       };
     });
@@ -2637,7 +2706,7 @@
   }
   async function openRescheduleAppt(apptId){
     const { data:a, error }=await sb.from('appointments').select('*').eq('id',apptId).single();
-    if(error||!a){ alert('Kon afspraak niet laden.'); return; }
+    if(error||!a){ toast('Kon afspraak niet laden.'); return; }
     const startLocal=new Date(a.start_time); const dur=Math.round((new Date(a.end_time)-startLocal)/60000);
     const def=new Date(startLocal.getTime()-startLocal.getTimezoneOffset()*60000).toISOString().slice(0,16);
     const body=`
@@ -2651,8 +2720,8 @@
       $('rsCancel').onclick=close;
       $('rsSave').onclick=async()=>{
         const btn=$('rsSave'); const orig=btn.innerHTML;
-        const title=$('rsTitle').value.trim(); if(!title){ alert('Geef de afspraak een titel.'); return; }
-        const when=$('rsWhen').value; if(!when){ alert('Kies een datum en tijd.'); return; }
+        const title=$('rsTitle').value.trim(); if(!title){ toast('Geef de afspraak een titel.'); return; }
+        const when=$('rsWhen').value; if(!when){ toast('Kies een datum en tijd.'); return; }
         const newDur=parseInt($('rsDur').value)||60;
         const newStart=new Date(when); const newEnd=new Date(newStart.getTime()+newDur*60000);
         const messageToCoachee=$('rsMessage').value.trim();
@@ -2664,10 +2733,10 @@
           if(error||data?.error) throw new Error(data?.error||error.message);
           close();
           if(a.coachee_id && !$('coTimelineView').classList.contains('hidden')) openTimeline(a.coachee_id);
-          if(data?.mail_error) alert('Afspraak is verzet, maar de mail ging niet uit: '+data.mail_error);
+          if(data?.mail_error) toast('Afspraak is verzet, maar de mail ging niet uit: '+data.mail_error);
         }catch(e){
           btn.disabled=false; btn.innerHTML=orig;
-          alert('Kon afspraak niet herplannen: '+e.message);
+          toast('Kon afspraak niet herplannen: '+e.message);
         }
       };
     });
@@ -2681,9 +2750,9 @@
       const { data, error }=await sb.functions.invoke('cancel-appointment',{ body:{ appointment_id:apptId, message_to_coachee:msg||null } });
       if(error||data?.error) throw new Error(data?.error||error.message);
       if(appt?.coachee_id && !$('coTimelineView').classList.contains('hidden')) openTimeline(appt.coachee_id);
-      if(data?.mail_error) alert('Afspraak is geannuleerd, maar de mail ging niet uit: '+data.mail_error);
+      if(data?.mail_error) toast('Afspraak is geannuleerd, maar de mail ging niet uit: '+data.mail_error);
     }catch(e){
-      alert('Kon afspraak niet annuleren: '+e.message);
+      toast('Kon afspraak niet annuleren: '+e.message);
     }
   }
 
@@ -2695,7 +2764,7 @@
       <div class="sheet-actions"><button class="act" id="ecCancel">Annuleren</button><button class="act primary" id="ecSave">Opslaan</button></div>`;
     openSheet('\u270E Coachee wijzigen', body, (ov,close)=>{
       $('ecCancel').onclick=close;
-      $('ecSave').onclick=async()=>{ const name=$('ecName').value.trim(); if(!name){ alert('Naam mag niet leeg zijn.'); return; } await sb.from('coachees').update({ name, email:$('ecEmail').value.trim()||null }).eq('id',id); close(); loadCoachees(); };
+      $('ecSave').onclick=async()=>{ const name=$('ecName').value.trim(); if(!name){ toast('Naam mag niet leeg zijn.'); return; } await sb.from('coachees').update({ name, email:$('ecEmail').value.trim()||null }).eq('id',id); close(); loadCoachees(); };
     });
   }
 
@@ -2709,10 +2778,10 @@
 
   $('coCreateBtn').addEventListener('click',async()=>{
     const name=$('coName').value.trim();
-    if(!name){ alert('Geef de coachee een naam.'); return; }
+    if(!name){ toast('Geef de coachee een naam.'); return; }
     const { data:{ user } }=await sb.auth.getUser();
     const { error }=await sb.from('coachees').insert({ user_id:user.id, name, email:$('coEmail').value.trim()||null });
-    if(error){ alert('Kon coachee niet toevoegen: '+error.message); return; }
+    if(error){ toast('Kon coachee niet toevoegen: '+error.message); return; }
     $('coName').value=''; $('coEmail').value='';
     await loadCoachees();
   });
@@ -2725,7 +2794,7 @@
     if(!confirm('Deze coachee verwijderen? De opnames blijven bestaan, maar raken losgekoppeld.')) return;
     btn.disabled=true;
     const { error }=await sb.from('coachees').delete().eq('id',id);
-    if(error){ alert('Kon niet verwijderen: '+error.message); btn.disabled=false; return; }
+    if(error){ toast('Kon niet verwijderen: '+error.message); btn.disabled=false; return; }
     await loadCoachees();
   }
 
@@ -2776,7 +2845,7 @@
 
   $('tplCreateBtn').addEventListener('click',async()=>{
     const name=$('tplName').value.trim();
-    if(!name){ alert('Geef het template een naam.'); return; }
+    if(!name){ toast('Geef het template een naam.'); return; }
     const secRaw=$('tplSections').value.trim();
     const sections=secRaw?secRaw.split(',').map(x=>x.trim()).filter(Boolean):null;
     const { data:{ user } }=await sb.auth.getUser();
@@ -2786,7 +2855,7 @@
       trigger_hint:$('tplTrigger').value.trim()||null,
       sections, instruction:$('tplInstruction').value.trim()||null
     });
-    if(error){ alert('Kon template niet opslaan: '+error.message); return; }
+    if(error){ toast('Kon template niet opslaan: '+error.message); return; }
     ['tplName','tplDesc','tplTrigger','tplSections','tplInstruction'].forEach(id=>$(id).value='');
     await loadTemplates();
   });
@@ -2795,7 +2864,7 @@
     if(!confirm('Dit template verwijderen?')) return;
     btn.disabled=true;
     const { error }=await sb.from('templates').delete().eq('id',id);
-    if(error){ alert('Kon niet verwijderen: '+error.message); btn.disabled=false; return; }
+    if(error){ toast('Kon niet verwijderen: '+error.message); btn.disabled=false; return; }
     await loadTemplates();
   }
 
@@ -2811,10 +2880,10 @@
         headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${session?.access_token||SUPABASE_KEY}` },
         body:JSON.stringify({ recording_id:recId, template_id:template_id||null }) });
       const data=await res.json();
-      if(data.error){ alert('Er ging iets mis: '+data.error); btn.disabled=false; btn.textContent=original; return; }
+      if(data.error){ toast('Er ging iets mis: '+data.error); btn.disabled=false; btn.textContent=original; return; }
       embedContent('recordings',recId);
       await load();
-    }catch(e){ alert('Verbindingsfout: '+e.message); btn.disabled=false; btn.textContent=original; }
+    }catch(e){ toast('Verbindingsfout: '+e.message); btn.disabled=false; btn.textContent=original; }
   }
 
   // ================= COACHEE-TIJDLIJN =================
@@ -3027,30 +3096,31 @@
     });
   }
 
+  let bookLimit=50;
   async function loadBooks(){
     if(!bookBuckets.length) await loadBookBuckets(); else renderBookBucketBar();
-    let q=sb.from('book_summaries').select('*').order('created_at',{ascending:false});
+    let q=sb.from('book_summaries').select('*',{count:'exact'}).order('created_at',{ascending:false}).limit(bookLimit);
     if(activeBookBucket!=='all'){
       const ids=await itemIdsForBucket('book_bucket_links','book_id',activeBookBucket);
       q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
     }
-    const { data:books, error }=await q;
+    const { data:books, error, count }=await q;
     if(error){ $('bkCards').innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
-    conn.textContent=`\u25CF ${books.length} boek${books.length===1?'':'en'}`;
+    conn.textContent=`\u25CF ${count??books.length} boek${(count??books.length)===1?'':'en'}`;
     if(!books.length){ $('bkCards').innerHTML=`<div class="empty"><div class="big">Nog geen boeken</div><p>Voeg hierboven je eerste boek toe.</p></div>`; return; }
     const bkByBook=await loadBucketLinksFor('book_bucket_links','book_id',books.map(b=>b.id));
-    $('bkCards').innerHTML=books.map(b=>bookCardHTML(b,bkByBook[b.id])).join('');
+    $('bkCards').innerHTML=books.map(b=>bookCardHTML(b,bkByBook[b.id])).join('')+loadMoreHTML('bookLimit+=50;loadBooks()',books.length,count);
   }
 
   $('bkCreateBtn').addEventListener('click',async()=>{
     const title=$('bkTitle').value.trim();
-    if(!title){ alert('Geef het boek een titel.'); return; }
+    if(!title){ toast('Geef het boek een titel.'); return; }
     const { data:{ user } }=await sb.auth.getUser();
     const { data, error }=await sb.from('book_summaries').insert({
       user_id:user.id, title, author:$('bkAuthor').value.trim()||null,
       source_notes:$('bkNotes').value.trim()||null, notebook_id:activeNB!=='all'?activeNB:null
     }).select().single();
-    if(error){ alert('Kon boek niet toevoegen: '+error.message); return; }
+    if(error){ toast('Kon boek niet toevoegen: '+error.message); return; }
     embedContent('book_summaries',data.id);
     ['bkTitle','bkAuthor','bkNotes'].forEach(id=>$(id).value='');
     await loadBooks();
@@ -3065,10 +3135,10 @@
         headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${session?.access_token||SUPABASE_KEY}` },
         body:JSON.stringify({ book_id:id }) });
       const data=await res.json();
-      if(data.error){ alert('Er ging iets mis: '+data.error); btn.disabled=false; btn.textContent=original; return; }
+      if(data.error){ toast('Er ging iets mis: '+data.error); btn.disabled=false; btn.textContent=original; return; }
       embedContent('book_summaries',id);
       await loadBooks();
-    }catch(e){ alert('Verbindingsfout: '+e.message); btn.disabled=false; btn.textContent=original; }
+    }catch(e){ toast('Verbindingsfout: '+e.message); btn.disabled=false; btn.textContent=original; }
   }
 
   function editBook(id,title,author){
@@ -3079,7 +3149,7 @@
     openSheet('\u270E Titel & auteur wijzigen', body, (ov,close)=>{
       $('ebCancel').onclick=close;
       $('ebSave').onclick=async()=>{
-        const t=$('ebTitle').value.trim(); if(!t){ alert('Een titel heb je wel nodig.'); return; }
+        const t=$('ebTitle').value.trim(); if(!t){ toast('Een titel heb je wel nodig.'); return; }
         const a=$('ebAuthor').value.trim();
         await sb.from('book_summaries').update({ title:t, author:a||null }).eq('id',id);
         close(); loadBooks();
@@ -3090,7 +3160,7 @@
     if(!confirm('Dit boek verwijderen?')) return;
     btn.disabled=true;
     const { error }=await sb.from('book_summaries').delete().eq('id',id);
-    if(error){ alert('Kon niet verwijderen: '+error.message); btn.disabled=false; return; }
+    if(error){ toast('Kon niet verwijderen: '+error.message); btn.disabled=false; return; }
     await loadBooks();
   }
 
@@ -3141,12 +3211,13 @@
       </div>
     </article>`;
   }
+  let docLimit=50;
   async function loadDocuments(){
-    const { data:docs, error }=await sb.from('documents').select('*').neq('status','deleted').order('created_at',{ascending:false});
+    const { data:docs, error, count }=await sb.from('documents').select('*',{count:'exact'}).neq('status','deleted').order('created_at',{ascending:false}).limit(docLimit);
     if(error){ $('docCards').innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
-    conn.textContent=`\u25CF ${docs.length} document${docs.length===1?'':'en'}`;
+    conn.textContent=`\u25CF ${count??docs.length} document${(count??docs.length)===1?'':'en'}`;
     if(!docs.length){ $('docCards').innerHTML=`<div class="empty"><div class="big">Nog geen documenten</div><p>Upload hierboven je eerste PDF, Word- of PowerPoint-bestand.</p></div>`; return; }
-    $('docCards').innerHTML=docs.map(docCardHTML).join('');
+    $('docCards').innerHTML=docs.map(docCardHTML).join('')+loadMoreHTML('docLimit+=50;loadDocuments()',docs.length,count);
   }
   function openDocUploadPopup(){
     const nbOpts=`<option value="">Geen notitieboek</option>`+notebookOptions(activeNB!=='all'?activeNB:null);
@@ -3171,7 +3242,7 @@
       ov.querySelector('#dupFile').addEventListener('change',e=>{
         chosenFile=e.target.files[0]||null;
         if(chosenFile){
-          if(chosenFile.size>20*1024*1024){ alert('Dit bestand is groter dan 20 MB \u2014 kies een kleiner bestand.'); chosenFile=null; ov.querySelector('#dupFile').value=''; return; }
+          if(chosenFile.size>20*1024*1024){ toast('Dit bestand is groter dan 20 MB \u2014 kies een kleiner bestand.'); chosenFile=null; ov.querySelector('#dupFile').value=''; return; }
           ov.querySelector('#dupLabel').textContent=chosenFile.name;
           ov.querySelector('#dupBtn').disabled=false;
         }
@@ -3184,7 +3255,7 @@
           close();
           await loadDocuments();
         }catch(e){
-          alert('Upload mislukt: '+e.message);
+          toast('Upload mislukt: '+e.message);
           btn.disabled=false; btn.textContent='Uploaden';
         }
       };
@@ -3212,10 +3283,10 @@
         headers:{ 'Content-Type':'application/json','Authorization':`Bearer ${session?.access_token||SUPABASE_KEY}` },
         body:JSON.stringify({ document_id:id }) });
       const data=await res.json();
-      if(data.error){ alert('Er ging iets mis: '+data.error); btn.disabled=false; btn.textContent=original; await loadDocuments(); return; }
+      if(data.error){ toast('Er ging iets mis: '+data.error); btn.disabled=false; btn.textContent=original; await loadDocuments(); return; }
       embedContent('documents',id);
       await loadDocuments();
-    }catch(e){ alert('Verbindingsfout: '+e.message); btn.disabled=false; btn.textContent=original; }
+    }catch(e){ toast('Verbindingsfout: '+e.message); btn.disabled=false; btn.textContent=original; }
   }
   function scheduleDocNote(id,ta){
     clearTimeout(ta._t);
@@ -3229,9 +3300,9 @@
   async function setDocNotebook(id,nbId){ await sb.from('documents').update({ notebook_id:nbId||null }).eq('id',id); await loadDocuments(); }
   async function openDocFile(id){
     const { data:doc, error }=await sb.from('documents').select('file_path,file_name').eq('id',id).single();
-    if(error||!doc){ alert('Kon document niet vinden.'); return; }
+    if(error||!doc){ toast('Kon document niet vinden.'); return; }
     const { data, error:urlErr }=await sb.storage.from('Documents').createSignedUrl(doc.file_path,3600);
-    if(urlErr||!data?.signedUrl){ alert('Kon geen link naar het bestand maken.'); return; }
+    if(urlErr||!data?.signedUrl){ toast('Kon geen link naar het bestand maken.'); return; }
     window.open(data.signedUrl,'_blank');
   }
   async function deleteDocument(id,btn){
@@ -3239,7 +3310,7 @@
     btn.disabled=true;
     const { data:doc }=await sb.from('documents').select('file_path').eq('id',id).single();
     const { error }=await sb.from('documents').delete().eq('id',id);
-    if(error){ alert('Kon niet verwijderen: '+error.message); btn.disabled=false; return; }
+    if(error){ toast('Kon niet verwijderen: '+error.message); btn.disabled=false; return; }
     if(doc?.file_path) await sb.storage.from('Documents').remove([doc.file_path]);
     await sb.from('embeddings').delete().eq('source_table','documents').eq('source_id',id);
     await loadDocuments();
@@ -3266,11 +3337,13 @@
   // ================= DASHBOARD =================
   const DASH_BLOCKS=[
     {id:'hello',   name:'Welkom',            wide:false},
+    {id:'today',   name:'Vandaag',            wide:false},
     {id:'stats',   name:'Statistieken',      wide:false},
     {id:'actions', name:'Openstaande acties', wide:false},
     {id:'duesoon', name:'Deze week vervallen', wide:false},
     {id:'recent',  name:'Meest recent',       wide:false},
     {id:'favs',    name:'Favorieten',          wide:false},
+    {id:'spark',   name:'Uit je archief',      wide:false},
     {id:'quick',   name:'Snelle start',       wide:false},
   ];
   let dashConfig=JSON.parse(localStorage.getItem('dashConfig')||'null');
@@ -3312,7 +3385,7 @@
       URL.revokeObjectURL(url);
       btn.innerHTML='\u2713 Gedownload';
     }catch(e){
-      alert('Backup mislukt: '+e.message);
+      toast('Backup mislukt: '+e.message);
       btn.innerHTML='Mislukt';
     }finally{
       setTimeout(()=>{ btn.disabled=false; btn.innerHTML=original; },2500);
@@ -3393,6 +3466,31 @@
       ...(fInsp.data||[]).map(x=>({t:x.title||x.url||(x.content||'').slice(0,40)||'Vonk',m:'inspiratie',go:()=>switchTab('fav')})),
     ];
     dashData.greet=greet;
+    // Vandaag: afspraken van vandaag met coachee-naam
+    try{
+      const d0=new Date(); d0.setHours(0,0,0,0); const d1=new Date(); d1.setHours(23,59,59,999);
+      const { data:appts }=await sb.from('appointments').select('id,title,start_time,end_time,meet_link,coachee_id,status').gte('start_time',d0.toISOString()).lte('start_time',d1.toISOString()).neq('status','cancelled').order('start_time',{ascending:true});
+      const coIds=[...new Set((appts||[]).map(a=>a.coachee_id).filter(Boolean))];
+      let coNames={};
+      if(coIds.length){ const { data }=await sb.from('coachees').select('id,name').in('id',coIds); (data||[]).forEach(c=>coNames[c.id]=c.name); }
+      dashData.today=(appts||[]).map(a=>({ ...a, coachee_name:coNames[a.coachee_id]||null }));
+    }catch(e){ dashData.today=[]; }
+    // Serendipiteit: willekeurige oude notitie of vonk (>30 dagen)
+    try{
+      const cutoff=new Date(Date.now()-30*864e5).toISOString();
+      const pickNote=Math.random()<0.6;
+      const base=pickNote
+        ? sb.from('notes').select('id,title,content,created_at',{count:'exact'}).is('recording_id',null).neq('status','deleted').lt('created_at',cutoff)
+        : sb.from('inspiration').select('id,title,content,url,created_at',{count:'exact'}).lt('created_at',cutoff);
+      const { count }=await (pickNote
+        ? sb.from('notes').select('id',{count:'exact',head:true}).is('recording_id',null).neq('status','deleted').lt('created_at',cutoff)
+        : sb.from('inspiration').select('id',{count:'exact',head:true}).lt('created_at',cutoff));
+      if(count){
+        const off=Math.floor(Math.random()*count);
+        const { data }=await base.order('created_at',{ascending:true}).range(off,off);
+        dashData.spark=data&&data[0]?{ ...data[0], kind:pickNote?'notitie':'vonk' }:null;
+      } else dashData.spark=null;
+    }catch(e){ dashData.spark=null; }
     renderDash();
   }
 
@@ -3418,6 +3516,31 @@
     let inner='';
     if(id==='hello'){
       inner=`<div class="db-hello"><h2>${dashData.greet||'Welkom'}, Daan \u{1F44B}</h2><p>Dit is wat er speelt in je tweede brein.</p></div>`;
+    }
+    else if(id==='today'){
+      const appts=dashData.today||[];
+      const fmt=d=>new Date(d).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+      const rows=appts.length?appts.map(a=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.05);">
+          <div style="font-weight:700;font-size:13px;min-width:44px;color:#549E39;">${fmt(a.start_time)}</div>
+          <div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.title||'Afspraak')}</div>${a.coachee_name?`<div style="font-size:12px;color:var(--ink-soft);">\u{1F464} ${esc(a.coachee_name)}</div>`:''}</div>
+          ${a.meet_link?`<a class="act" href="${esc(a.meet_link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;">\u{1F4F9}</a>`:''}
+          ${a.coachee_id?`<button class="act" title="Laat Dain je voorbereiden" onclick="prepSession('${a.coachee_id}','${escJs(a.coachee_name||'')}')">\u{1F4CB} Prep</button>`:''}
+        </div>`).join(''):'<div class="db-empty">Geen afspraken vandaag \u2014 ruimte om te denken \u{1F9D8}</div>';
+      inner=`<div class="db-title">Vandaag</div>${rows}`;
+    }
+    else if(id==='spark'){
+      const sp=dashData.spark;
+      if(!sp){ inner=`<div class="db-title">Uit je archief</div><div class="db-empty">Nog te weinig ouds om op te duiken \u2014 kom over een maand terug \u23F3</div>`; }
+      else {
+        const ago=Math.round((Date.now()-new Date(sp.created_at))/864e5);
+        const agoTxt=ago>=365?`${Math.floor(ago/365)} jaar geleden`:ago>=60?`${Math.floor(ago/30)} maanden geleden`:`${ago} dagen geleden`;
+        const prev=esc((sp.content||sp.url||'').replace(/\[\[img:[a-zA-Z0-9-]+\]\]/g,'').slice(0,180));
+        inner=`<div class="db-title">Uit je archief <button class="act" style="float:right;padding:2px 9px;" title="Nog eentje" onclick="loadDashboard()">\u{1F3B2}</button></div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${esc(sp.title||'Naamloze '+sp.kind)}</div>
+          <div style="font-size:13px;color:var(--ink-soft);line-height:1.5;">${prev}${prev.length>=180?'\u2026':''}</div>
+          <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;">${sp.kind} \u00b7 ${agoTxt} \u00b7 <a href="#" onclick="event.preventDefault();switchTab('${sp.kind==='vonk'?'insp':'note'}')" style="color:var(--blue);">bekijken \u2192</a></div>`;
+      }
     }
     else if(id==='stats'){
       const c=dashData.counts;
@@ -3599,7 +3722,7 @@
       else if(activeTab==='map'){ loadMaps(); }
       else { await load(); }
     } catch(e){
-      alert('Kon niet verwijderen: '+e.message);
+      toast('Kon niet verwijderen: '+e.message);
       if(btn) btn.disabled=false;
     }
   }
@@ -3608,7 +3731,7 @@
     const name=await promptModal('Titel van de opname', current, { okLabel:'Opslaan' }); if(name===null) return;
     const title=name.trim(); if(!title) return;
     const { error }=await sb.from('recordings').update({ title, title_is_auto:false }).eq('id',id);
-    if(error){ alert('Kon titel niet opslaan: '+error.message); return; }
+    if(error){ toast('Kon titel niet opslaan: '+error.message); return; }
     load();
   }
   async function apptOptionsFor(coId,selectedApptId){
@@ -3756,7 +3879,7 @@
   async function downloadVisualReport(){
     const overlay=document.getElementById('vrOverlay'); const recId=overlay?.dataset.recId; if(!recId) return;
     const { data:rec }=await sb.from('recordings').select('title,visual_report_html').eq('id',recId).single();
-    if(!rec?.visual_report_html){ alert('Nog geen verslag om te downloaden.'); return; }
+    if(!rec?.visual_report_html){ toast('Nog geen verslag om te downloaden.'); return; }
     const blob=new Blob([rec.visual_report_html],{ type:'text/html' });
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     a.download=(rec.title||'verslag').replace(/[^a-zA-Z0-9]/g,'_')+'.html'; a.click(); URL.revokeObjectURL(a.href);
@@ -3779,7 +3902,7 @@
       });
       const data=await res.json();
       if(data.error){
-        alert('Transcriptie fout: '+data.error);
+        toast('Transcriptie fout: '+data.error);
         await sb.from('recordings').update({status:'failed'}).eq('id',id);
         await load();
         return;
@@ -3791,9 +3914,9 @@
       const { data:current }=await sb.from('recordings').select('status').eq('id',id).maybeSingle();
       if(current?.status==='transcribing'){
         await sb.from('recordings').update({status:'failed'}).eq('id',id);
-        alert('Kon de transcriptie niet starten: '+e.message);
+        toast('Kon de transcriptie niet starten: '+e.message);
       } else {
-        alert('Verbindingsfout: '+e.message);
+        toast('Verbindingsfout: '+e.message);
       }
       await load();
     }
@@ -3811,6 +3934,47 @@
       }
       if(tries>60) clearInterval(timer); // na ~15 min stoppen we met pollen; de handmatige 'vastgelopen?'-knop blijft beschikbaar
     },15000);
+  }
+
+  // ================= ZOEKRESULTAAT DIRECT OPENEN =================
+  // Haalt het specifieke item op (ongeacht welke pagina van de feed geladen is)
+  // en zet het bovenaan met een 'terug'-knop, zodat je niet in een lege
+  // 'nieuwe notitie'-composer of de verkeerde plek in de lijst belandt.
+  async function openSearchResult(kind,id){
+    switchTab(kind);
+    const containerId={ note:'feedNote', rec:'feed', book:'bkCards', doc:'docCards' }[kind];
+    const backLoader={ note:'loadNoteFeed', rec:'loadRecordings', book:'loadBooks', doc:'loadDocuments' }[kind];
+    const el=$(containerId); if(!el) return;
+    el.innerHTML='<div class="empty"><div class="big">Openen\u2026</div></div>';
+    try{
+      let html='';
+      if(kind==='note'){
+        const { data:n }=await sb.from('notes').select('*').eq('id',id).maybeSingle();
+        if(!n) throw new Error('niet gevonden');
+        const att=(await loadAttachmentsFor('note',[id]))[id];
+        const bk=(await loadBucketLinksFor('note_bucket_links','note_id',[id]))[id];
+        html=noteCardHTML(n,att,bk);
+      } else if(kind==='rec'){
+        const { data:r }=await sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)').eq('id',id).maybeSingle();
+        if(!r) throw new Error('niet gevonden');
+        await refreshVrIds();
+        html=recCardHTML(r);
+      } else if(kind==='book'){
+        const { data:b }=await sb.from('book_summaries').select('*').eq('id',id).maybeSingle();
+        if(!b) throw new Error('niet gevonden');
+        const bk=(await loadBucketLinksFor('book_bucket_links','book_id',[id]))[id];
+        html=bookCardHTML(b,bk);
+      } else if(kind==='doc'){
+        const { data:d }=await sb.from('documents').select('*').eq('id',id).maybeSingle();
+        if(!d) throw new Error('niet gevonden');
+        html=docCardHTML(d);
+      }
+      el.innerHTML=`<div style="margin-bottom:14px;"><button class="act" onclick="${backLoader}()">\u2190 Terug naar alles</button></div>
+        <div id="searchJump" style="border-radius:16px;box-shadow:0 0 0 3px ${COL.green||'#549E39'};transition:box-shadow 1.2s ease;">${html}</div>`;
+      initPendingPdfViewers();
+      document.getElementById('searchJump')?.querySelector('.card')?.classList.add('open');
+      setTimeout(()=>{ const j=$('searchJump'); if(j) j.style.boxShadow='none'; },1800);
+    }catch(e){ el.innerHTML=`<div class="empty"><div class="big">Kon dit niet openen</div><p>${esc(e.message)}</p></div>`; }
   }
 
   // ================= GLOBAAL ZOEKEN =================
@@ -3843,19 +4007,19 @@
     }
     let cards='';
     (nt.data||[]).forEach(n=>{
-      cards+=`<article class="card" style="cursor:pointer;" onclick="switchTab('note')"><div class="card-head"><div><div class="card-title">${esc(n.title||'Naamloze notitie')}</div><div class="card-meta">${snip(n.content||'')}</div></div><span class="pill note">notitie</span></div></article>`;
+      cards+=`<article class="card" style="cursor:pointer;" onclick="openSearchResult('note','${n.id}')"><div class="card-head"><div><div class="card-title">${esc(n.title||'Naamloze notitie')}</div><div class="card-meta">${snip(n.content||'')}</div></div><span class="pill note">notitie</span></div></article>`;
     });
     (rc.data||[]).forEach(r=>{
-      cards+=`<article class="card" style="cursor:pointer;" onclick="switchTab('rec')"><div class="card-head"><div><div class="card-title">${esc(r.title||'Naamloze opname')}</div><div class="card-meta">titel-match</div></div><span class="pill transcribed">opname</span></div></article>`;
+      cards+=`<article class="card" style="cursor:pointer;" onclick="openSearchResult('rec','${r.id}')"><div class="card-head"><div><div class="card-title">${esc(r.title||'Naamloze opname')}</div><div class="card-meta">titel-match</div></div><span class="pill transcribed">opname</span></div></article>`;
     });
     (tr.data||[]).forEach(t=>{
-      cards+=`<article class="card" style="cursor:pointer;" onclick="switchTab('rec')"><div class="card-head"><div><div class="card-title">${esc(recTitles[t.recording_id]||'Opname')}</div><div class="card-meta">${snip(t.full_text||'')}</div></div><span class="pill summarized">transcript</span></div></article>`;
+      cards+=`<article class="card" style="cursor:pointer;" onclick="openSearchResult('rec','${t.recording_id}')"><div class="card-head"><div><div class="card-title">${esc(recTitles[t.recording_id]||'Opname')}</div><div class="card-meta">${snip(t.full_text||'')}</div></div><span class="pill summarized">transcript</span></div></article>`;
     });
     (bk.data||[]).forEach(b=>{
-      cards+=`<article class="card" style="cursor:pointer;" onclick="switchTab('book')"><div class="card-head"><div><div class="card-title">${esc(b.title)}</div><div class="card-meta">${esc(b.author||'')}</div></div><span class="pill uploaded">boek</span></div></article>`;
+      cards+=`<article class="card" style="cursor:pointer;" onclick="openSearchResult('book','${b.id}')"><div class="card-head"><div><div class="card-title">${esc(b.title)}</div><div class="card-meta">${esc(b.author||'')}</div></div><span class="pill uploaded">boek</span></div></article>`;
     });
     (dc.data||[]).forEach(d=>{
-      cards+=`<article class="card" style="cursor:pointer;" onclick="switchTab('doc')"><div class="card-head"><div><div class="card-title">${esc(d.title||d.file_name)}</div><div class="card-meta">${snip(d.ai_summary||d.file_name||'')}</div></div><span class="pill uploaded">document</span></div></article>`;
+      cards+=`<article class="card" style="cursor:pointer;" onclick="openSearchResult('doc','${d.id}')"><div class="card-head"><div><div class="card-title">${esc(d.title||d.file_name)}</div><div class="card-meta">${snip(d.ai_summary||d.file_name||'')}</div></div><span class="pill uploaded">document</span></div></article>`;
     });
     // Semantische matches (embeddings) die de keyword-zoekopdracht miste
     const seenNoteIds=new Set((nt.data||[]).map(n=>n.id));
@@ -3873,7 +4037,8 @@
     });
     let aiCards='';
     aiResults.forEach(r=>{
-      aiCards+=`<article class="card" style="cursor:pointer;" onclick="switchTab('${aiTabFor[r.source_table]||'search'}')"><div class="card-head"><div><div class="card-title">${esc(r.title||'Zonder titel')}</div><div class="card-meta">${esc((r.content_preview||'').slice(0,140))}\u2026</div></div><span class="pill note">${aiPillFor[r.source_table]||'match'} \u00b7 ${Math.round((r.similarity||0)*100)}%</span></div></article>`;
+      const kind=aiTabFor[r.source_table]||'search';
+      aiCards+=`<article class="card" style="cursor:pointer;" onclick="${kind==='search'?'':`openSearchResult('${kind}','${r.source_id}')`}"><div class="card-head"><div><div class="card-title">${esc(r.title||'Zonder titel')}</div><div class="card-meta">${esc((r.content_preview||'').slice(0,140))}\u2026</div></div><span class="pill note">${aiPillFor[r.source_table]||'match'} \u00b7 ${Math.round((r.similarity||0)*100)}%</span></div></article>`;
     });
     const aiSection=aiCards?`<div class="section-label" style="margin-top:18px;"><span>Dain denkt hierbij aan</span></div>${aiCards}`:'';
     $('searchResults').innerHTML=(cards||`<div class="empty"><div class="big">Niks gevonden</div><p>Geen letterlijke match voor \u201C${esc(q)}\u201D.</p></div>`)+aiSection;
@@ -3889,7 +4054,7 @@
       btn.innerHTML='\u2713 '+(data.embedded||0)+' nieuw ge\u00efndexeerd';
     }catch(e){
       btn.innerHTML='Mislukt';
-      alert('Herindexeren mislukt: '+e.message);
+      toast('Herindexeren mislukt: '+e.message);
     }finally{
       setTimeout(()=>{ btn.disabled=false; btn.innerHTML=orig; },2500);
     }
@@ -3919,7 +4084,7 @@
     dictRec.onerror=()=>{ dictOn=false; $('micBtn').classList.remove('on'); };
   }
   $('micBtn').addEventListener('click',()=>{
-    if(!SR){ alert('Dicteren werkt alleen in Chrome of Edge.'); return; }
+    if(!SR){ toast('Dicteren werkt alleen in Chrome of Edge.'); return; }
     dictOn=!dictOn;
     $('micBtn').classList.toggle('on',dictOn);
     if(dictOn){ try{ dictRec.start(); }catch(_){ } } else dictRec.stop();
@@ -4074,7 +4239,7 @@
     }
     try{
       liveStream=await navigator.mediaDevices.getUserMedia({ audio:true });
-    }catch(e){ alert('Geen toegang tot de microfoon: '+e.message); return; }
+    }catch(e){ toast('Geen toegang tot de microfoon: '+e.message); return; }
     liveChunks=[];
     let mime='audio/webm';
     if(!MediaRecorder.isTypeSupported(mime)) mime='';
@@ -4089,18 +4254,18 @@
   }
 
   async function saveLiveRec(close){
-    if(!liveChunks.length){ alert('Er is nog niets opgenomen.'); return; }
+    if(!liveChunks.length){ toast('Er is nog niets opgenomen.'); return; }
     const btn=$('liveSave'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Opslaan\u2026';
     const blob=new Blob(liveChunks,{ type:liveChunks[0].type||'audio/webm' });
     const { data:{ user } }=await sb.auth.getUser();
     const ext=(blob.type.includes('mp4')||blob.type.includes('m4a'))?'m4a':'webm';
     const path=`${Date.now()}_live.${ext}`;
     const { error:upErr }=await sb.storage.from('Recordings').upload(path,blob);
-    if(upErr){ alert('Upload mislukt: '+upErr.message); btn.disabled=false; btn.textContent='Opslaan & transcriberen'; return; }
+    if(upErr){ toast('Upload mislukt: '+upErr.message); btn.disabled=false; btn.textContent='Opslaan & transcriberen'; return; }
     const title=$('liveTitle').value.trim()||('Live-opname '+new Date().toLocaleString('nl-NL'));
     const nb=$('liveNb').value||null, co=$('liveCo').value||null, bk=$('liveBucket').value||null;
     const { data:rec, error:insErr }=await sb.from('recordings').insert({ user_id:user.id, title, source:'live', audio_path:path, language:'nl', status:'uploaded', notebook_id:nb, coachee_id:co, bucket_id:bk, appointment_id:liveApptId }).select().single();
-    if(insErr){ alert('Opslaan mislukt: '+insErr.message); btn.disabled=false; return; }
+    if(insErr){ toast('Opslaan mislukt: '+insErr.message); btn.disabled=false; return; }
     const notes=$('liveNotes').value.trim();
     if(notes){ await sb.from('notes').insert({ user_id:user.id, title:'Aantekeningen: '+title, content:notes, notebook_id:nb, coachee_id:co, recording_id:rec.id }); }
     stopLiveTracks(); close();
@@ -4145,7 +4310,7 @@
     const { close }=openSheet(t.id?'\u270E Template bewerken':'+ Nieuw template', body, (ov,cl)=>{
       $('tfCancel').onclick=cl;
       $('tfSave').onclick=async()=>{
-        const name=$('tfName').value.trim(); if(!name){ alert('Geef het template een naam.'); return; }
+        const name=$('tfName').value.trim(); if(!name){ toast('Geef het template een naam.'); return; }
         const secRaw=$('tfSecs').value.trim();
         const sections=secRaw?secRaw.split(',').map(x=>x.trim()).filter(Boolean):null;
         const payload={ name, description:$('tfDesc').value.trim()||null, trigger_hint:$('tfTrig').value.trim()||null, sections, instruction:$('tfInstr').value.trim()||null };
@@ -4245,20 +4410,21 @@
     await loadBuckets(); loadInspiration();
   }
 
+  let inspLimit=50;
   async function loadInspiration(){
     const grid=$('inspGrid');
     if(!inspBuckets.length) await loadBuckets(); else renderBucketBar();
     grid.innerHTML='<div class="empty"><div class="big">Laden\u2026</div></div>';
-    let q=sb.from('inspiration').select('*').order('created_at',{ascending:false});
+    let q=sb.from('inspiration').select('*',{count:'exact'}).order('created_at',{ascending:false}).limit(inspLimit);
     if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
     if(activeBucket!=='all'){
       const ids=await itemIdsForBucket('inspiration_bucket_links','inspiration_id',activeBucket);
       q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
     }
-    const { data:items,error }=await q;
+    const { data:items,error,count:inspCount }=await q;
     if(error){ grid.innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
     inspItems=items;
-    conn.textContent=`\u25CF ${items.length} vonk${items.length===1?'':'en'}`;
+    conn.textContent=`\u25CF ${inspCount??items.length} vonk${(inspCount??items.length)===1?'':'en'}`;
     if(!items.length){ grid.innerHTML=`<div class="empty"><div class="big">Nog leeg</div><p>${activeBucket==='all'?'Plak een link, sleep een screenshot of upload een foto om te beginnen.':'Deze bucket is nog leeg. Koppel er vonken aan via het potloodje op een kaart.'}</p></div>`; return; }
     const attByInsp=await loadAttachmentsFor('inspiration',items.map(i=>i.id));
     const bkByInsp=await loadBucketLinksFor('inspiration_bucket_links','inspiration_id',items.map(i=>i.id));
@@ -4292,7 +4458,7 @@
         ${media}${bodyBlock}
       </div>`;
     }));
-    grid.innerHTML=cards.join('');
+    grid.innerHTML=cards.join('')+(inspCount>items.length?`<div style="grid-column:1/-1;text-align:center;margin:10px 0;"><button class="act" onclick="inspLimit+=50;loadInspiration()">\u2B07 Laad meer (${items.length} van ${inspCount})</button></div>`:'');
     initPendingPdfViewers();
   }
   async function openInspBucketPicker(id){
@@ -4313,7 +4479,7 @@
     openSheet('\u{1F517} Link toevoegen', body, (ov,close)=>{
       $('ilCancel').onclick=close;
       $('ilSave').onclick=async()=>{
-        const url=$('ilUrl').value.trim(); if(!url){ alert('Plak een link.'); return; }
+        const url=$('ilUrl').value.trim(); if(!url){ toast('Plak een link.'); return; }
         const kind=(ytEmbed(url)||vimeoEmbed(url))?'video':'link';
         const { data:{ user } }=await sb.auth.getUser();
         await sb.from('inspiration').insert({ user_id:user.id, kind, url, title:$('ilTitle').value.trim()||null, content:$('ilNote').value.trim()||null, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:$('ilBucket').value||null });
@@ -4330,7 +4496,7 @@
     openSheet('\u{1F4DD} Los briefje', body, (ov,close)=>{
       $('inCancel').onclick=close;
       $('inSave').onclick=async()=>{
-        const txt=$('inTxt').value.trim(); if(!txt){ alert('Schrijf iets.'); return; }
+        const txt=$('inTxt').value.trim(); if(!txt){ toast('Schrijf iets.'); return; }
         const { data:{ user } }=await sb.auth.getUser();
         const titleInput=$('inTitle').value.trim();
         const { data:row }=await sb.from('inspiration').insert({ user_id:user.id, kind:'note', title:titleInput||null, content:txt, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:$('inBucket').value||null }).select().single();
@@ -4353,7 +4519,7 @@
     const safe=(file.name||'beeld').replace(/[^a-zA-Z0-9._-]/g,'_');
     const path=`${user.id}/${Date.now()}_${safe}`;
     const { error }=await sb.storage.from('Inspiration').upload(path,file);
-    if(error){ alert('Upload mislukt: '+error.message); return; }
+    if(error){ toast('Upload mislukt: '+error.message); return; }
     await sb.from('inspiration').insert({ user_id:user.id, kind:'image', image_path:path, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:activeBucket!=='all'?activeBucket:null });
   }
   $('inspFile').addEventListener('change',async e=>{
@@ -4448,16 +4614,16 @@
   async function loadNoteFeed(){
     const fn=$('feedNote'); if(!fn) return;
     if(!noteBuckets.length) await loadNoteBuckets(); else renderNoteBucketBar();
-    let q=sb.from('notes').select('*').is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false});
+    let q=sb.from('notes').select('*',{count:'exact'}).is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false}).limit(noteLimit);
     if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
     if(activeNoteBucket!=='all'){
       const ids=await itemIdsForBucket('note_bucket_links','note_id',activeNoteBucket);
       q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
     }
-    const { data:notes }=await q;
+    const { data:notes, count }=await q;
     const attByNote=await loadAttachmentsFor('note',(notes||[]).map(n=>n.id));
     const bkByNote=await loadBucketLinksFor('note_bucket_links','note_id',(notes||[]).map(n=>n.id));
-    fn.innerHTML=(notes||[]).map(n=>noteCardHTML(n,attByNote[n.id],bkByNote[n.id])).join('');
+    fn.innerHTML=(notes||[]).map(n=>noteCardHTML(n,attByNote[n.id],bkByNote[n.id])).join('')+loadMoreHTML('noteLimit+=50;loadNoteFeed()',(notes||[]).length,count);
     initPendingPdfViewers();
   }
   async function openNoteBucketPicker(id){
@@ -4508,7 +4674,267 @@
   }
 
 
-  (async()=>{ const { data:{ session } }=await sb.auth.getSession(); if(session) showApp(); })();
+  // ================= GERELATEERDE ITEMS (semantisch) =================
+  async function openRelated(kind,id){
+    openSheet('\u{1F9ED} Gerelateerd in je brein','<div id="relBody"><div class="empty"><div class="big">Dain zoekt verbanden\u2026</div></div></div>',async(ov,close)=>{
+      try{
+        let text='';
+        if(kind==='note'){
+          const { data }=await sb.from('notes').select('title,content').eq('id',id).single();
+          text=((data?.title||'')+'\n'+(data?.content||'')).replace(/\[\[img:[a-zA-Z0-9-]+\]\]/g,'').slice(0,900);
+        } else if(kind==='recording'){
+          const [{ data:rec },{ data:tr }]=await Promise.all([
+            sb.from('recordings').select('title').eq('id',id).single(),
+            sb.from('transcripts').select('full_text').eq('recording_id',id).maybeSingle(),
+          ]);
+          text=((rec?.title||'')+'\n'+(tr?.full_text||'')).slice(0,900);
+        }
+        if(!text.trim()){ ov.querySelector('#relBody').innerHTML='<div class="empty"><div class="big">Geen inhoud om op te zoeken</div></div>'; return; }
+        const { data:res, error }=await sb.functions.invoke('semantic-search',{ body:{ query:text, match_count:9 } });
+        if(error) throw new Error(error.message);
+        const tabFor={recordings:'rec',notes:'note',book_summaries:'book',documents:'doc'};
+        const pillFor={recordings:'opname',notes:'notitie',book_summaries:'boek',documents:'document'};
+        const items=(res?.results||[]).filter(r=>!(r.source_id===id))
+          .slice(0,7);
+        if(!items.length){ ov.querySelector('#relBody').innerHTML='<div class="empty"><div class="big">Geen sterke verbanden gevonden</div><p>Dit item staat (nog) op zichzelf.</p></div>'; return; }
+        ov.querySelector('#relBody').innerHTML=items.map(r=>`
+          <article class="card" style="cursor:pointer;margin-bottom:8px;" onclick="this.closest('.sheet-overlay').remove();openSearchResult('${tabFor[r.source_table]||'search'}','${r.source_id}');">
+            <div class="card-head"><div style="flex:1;min-width:0;"><div class="card-title">${esc(r.title||'Zonder titel')}</div><div class="card-meta">${esc((r.content_preview||'').slice(0,120))}\u2026</div></div>
+            <span class="pill note">${pillFor[r.source_table]||'match'} \u00b7 ${Math.round((r.similarity||0)*100)}%</span></div>
+          </article>`).join('');
+      }catch(e){ ov.querySelector('#relBody').innerHTML=`<div class="empty"><div class="big">Zoeken mislukt</div><p>${esc(e.message)}</p></div>`; }
+    });
+  }
+
+  // ================= SESSIEVOORBEREIDING VIA DAIN =================
+  function prepSession(coacheeId,name){
+    chatScope={ notebook_ids:null, coachee_id:coacheeId };
+    switchTab('chat'); updateScopeBtn();
+    const input=$('chatInput');
+    input.value=`Bereid me voor op mijn sessie met ${name||'deze coachee'} vandaag: vat de laatste sessie kort samen, noem de openstaande actiepunten en geef me het belangrijkste aandachtspunt of follow-up advies.`;
+    askDain();
+  }
+
+  // ================= CHAT-PERSISTENTIE (gesprekken bewaren) =================
+  let chatThreadId=null, chatPersistOK=null;
+  async function chatPersistCheck(){
+    if(chatPersistOK!==null) return chatPersistOK;
+    try{ const { error }=await sb.from('chat_threads').select('id').limit(1); chatPersistOK=!error; }
+    catch(e){ chatPersistOK=false; }
+    return chatPersistOK;
+  }
+  async function persistChat(q,answer,sources){
+    if(!await chatPersistCheck()) return;
+    try{
+      if(!chatThreadId){
+        const { data }=await sb.from('chat_threads').insert({ title:q.slice(0,80) }).select('id').single();
+        chatThreadId=data?.id||null;
+      }
+      if(!chatThreadId) return;
+      await sb.from('chat_messages').insert([
+        { thread_id:chatThreadId, role:'user', content:q },
+        { thread_id:chatThreadId, role:'assistant', content:answer, sources:sources&&sources.length?sources:null },
+      ]);
+    }catch(e){}
+  }
+  function newChat(){
+    chatThreadId=null; chatHistory=[];
+    $('chatLog').innerHTML='<div class="chat-empty">Vraag Dain wat je wilt weten over je eigen notities, opnames en inzichten. Of zet een sparmodus aan: laat \u2019m je idee aanvallen, denkfouten zoeken of meedenken als een expert.</div>';
+    $('chatInput').focus();
+  }
+  async function openChatHistory(){
+    if(!await chatPersistCheck()){ toast('Gespreksgeschiedenis staat nog uit \u2014 draai eerst de chat-tabellen migratie.','err'); return; }
+    const { data:threads }=await sb.from('chat_threads').select('id,title,created_at').order('created_at',{ascending:false}).limit(40);
+    const rows=(threads||[]).map(t=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid rgba(0,0,0,.05);">
+        <div style="flex:1;min-width:0;cursor:pointer;" onclick="loadChatThread('${t.id}');this.closest('.sheet-overlay').remove();">
+          <div style="font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.title||'Gesprek')}</div>
+          <div style="font-size:11.5px;color:var(--ink-faint);">${new Date(t.created_at).toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'})}</div>
+        </div>
+        <button class="act" title="Verwijderen" onclick="delChatThread('${t.id}',this)">\u{1F5D1}</button>
+      </div>`).join('');
+    openSheet('\u{1F4AC} Eerdere gesprekken met Dain', rows||'<div class="empty"><div class="big">Nog geen bewaarde gesprekken</div><p>Zodra je met Dain praat, verschijnen ze hier vanzelf.</p></div>');
+  }
+  async function loadChatThread(tid){
+    const { data:msgs }=await sb.from('chat_messages').select('role,content,sources,created_at').eq('thread_id',tid).order('created_at',{ascending:true});
+    chatThreadId=tid; chatHistory=[];
+    const log=$('chatLog'); log.innerHTML='';
+    (msgs||[]).forEach(m=>{ addMsg(m.role==='user'?'user':'dain',m.content,m.sources||null); chatHistory.push({role:m.role,content:m.content}); });
+    switchTab('chat');
+  }
+  async function delChatThread(tid,btn){
+    btn.disabled=true;
+    await sb.from('chat_threads').delete().eq('id',tid);
+    btn.closest('div').remove();
+    if(chatThreadId===tid) newChat();
+  }
+
+  // ================= COMMAND PALETTE (Cmd/Ctrl+K) =================
+  let ckSel=0, ckItems=[];
+  function ensureCmdk(){
+    if($('cmdkOverlay')) return;
+    const ov=document.createElement('div'); ov.id='cmdkOverlay';
+    ov.innerHTML='<div id="cmdkBox"><input id="cmdkInput" type="text" placeholder="Typ een opdracht of zoek in je brein\u2026" autocomplete="off"><div id="cmdkList"></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('mousedown',e=>{ if(e.target===ov) closeCmdk(); });
+    $('cmdkInput').addEventListener('input',debounceCk);
+    $('cmdkInput').addEventListener('keydown',e=>{
+      if(e.key==='ArrowDown'){ e.preventDefault(); ckMove(1); }
+      else if(e.key==='ArrowUp'){ e.preventDefault(); ckMove(-1); }
+      else if(e.key==='Enter'){ e.preventDefault(); ckRun(); }
+      else if(e.key==='Escape'){ closeCmdk(); }
+    });
+  }
+  const CK_ACTIONS=[
+    { icon:'\u{1F4DD}', label:'Nieuwe notitie', run:()=>{ switchTab('note'); setTimeout(()=>$('noteTitle')?.focus(),150); } },
+    { icon:'\u{1F3A4}', label:'Naar opnames', run:()=>switchTab('rec') },
+    { icon:'\u2728', label:'Vraag Dain', run:()=>{ switchTab('chat'); setTimeout(()=>$('chatInput')?.focus(),150); } },
+    { icon:'\u{1F50D}', label:'Zoek in je brein', run:()=>{ switchTab('search'); setTimeout(()=>$('globalSearch')?.focus(),150); } },
+    { icon:'\u{1F578}\uFE0F', label:'Kennisgraaf', run:()=>openKnowledgeGraph() },
+    { icon:'\u{1F4CA}', label:'Dashboard', run:()=>switchTab('dash') },
+    { icon:'\u{1F464}', label:'Coachees', run:()=>switchTab('coach') },
+    { icon:'\u{1F4A1}', label:'Inspiratie', run:()=>switchTab('insp') },
+    { icon:'\u{1F4DA}', label:'Boeken', run:()=>switchTab('book') },
+    { icon:'\u{1F4C4}', label:'Documenten', run:()=>switchTab('doc') },
+  ];
+  function openCmdk(){ ensureCmdk(); $('cmdkOverlay').classList.add('open'); $('cmdkInput').value=''; renderCk(CK_ACTIONS.map(a=>({...a,meta:'actie'}))); $('cmdkInput').focus(); }
+  function closeCmdk(){ $('cmdkOverlay')?.classList.remove('open'); }
+  function renderCk(items){
+    ckItems=items; ckSel=0;
+    $('cmdkList').innerHTML=items.length?items.map((it,i)=>`<div class="cmdk-item${i===0?' sel':''}" data-i="${i}" onclick="ckSel=${i};ckRun()"><span>${it.icon}</span><span>${esc(it.label)}</span><span class="ck-meta">${it.meta||''}</span></div>`).join(''):'<div class="cmdk-item">Niks gevonden\u2026</div>';
+  }
+  function ckMove(d){
+    if(!ckItems.length) return;
+    ckSel=(ckSel+d+ckItems.length)%ckItems.length;
+    document.querySelectorAll('.cmdk-item').forEach((el,i)=>el.classList.toggle('sel',i===ckSel));
+    document.querySelector('.cmdk-item.sel')?.scrollIntoView({block:'nearest'});
+  }
+  function ckRun(){ const it=ckItems[ckSel]; if(!it) return; closeCmdk(); it.run(); }
+  let ckTimer=null;
+  function debounceCk(){ clearTimeout(ckTimer); ckTimer=setTimeout(ckSearch,250); }
+  async function ckSearch(){
+    const q=$('cmdkInput').value.trim();
+    if(q.length<2){ renderCk(CK_ACTIONS.map(a=>({...a,meta:'actie'}))); return; }
+    const like=`%${q.replace(/[%_]/g,'')}%`;
+    const acts=CK_ACTIONS.filter(a=>a.label.toLowerCase().includes(q.toLowerCase())).map(a=>({...a,meta:'actie'}));
+    const [nt,rc,co]=await Promise.all([
+      sb.from('notes').select('id,title').ilike('title',like).is('recording_id',null).neq('status','deleted').limit(5),
+      sb.from('recordings').select('id,title').ilike('title',like).neq('status','deleted').limit(5),
+      sb.from('coachees').select('id,name').ilike('name',like).limit(4),
+    ]);
+    const items=[
+      ...acts,
+      ...(nt.data||[]).map(n=>({ icon:'\u{1F4DD}', label:n.title||'Naamloze notitie', meta:'notitie', run:()=>switchTab('note') })),
+      ...(rc.data||[]).map(r=>({ icon:'\u{1F3A4}', label:r.title||'Naamloze opname', meta:'opname', run:()=>switchTab('rec') })),
+      ...(co.data||[]).map(c=>({ icon:'\u{1F464}', label:c.name, meta:'coachee', run:()=>switchTab('coach') })),
+    ];
+    renderCk(items);
+  }
+  document.addEventListener('keydown',e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); openCmdk(); }
+  });
+
+  // ================= KENNISGRAAF: [[wiki-links]] gevisualiseerd =================
+  async function openKnowledgeGraph(){
+    openSheet('\u{1F578}\uFE0F Kennisgraaf \u2014 zo hangt je brein samen',
+      '<div id="kgWrap" style="height:68vh;position:relative;background:#f7f8fc;border-radius:12px;overflow:hidden;"><div class="empty"><div class="big">Verbanden in kaart brengen\u2026</div></div></div>',
+      async(ov)=>{
+      const wrap=ov.querySelector('#kgWrap');
+      try{
+        if(!coachees.length) await loadCoacheeList();
+        const { data:notes }=await sb.from('notes').select('id,title,content').is('recording_id',null).neq('status','deleted').limit(800);
+        const coacheeByName={}; (coachees||[]).forEach(c=>coacheeByName[(c.name||'').toLowerCase()]=c);
+        const noteByTitle={}; (notes||[]).forEach(n=>{ if(n.title) noteByTitle[n.title.toLowerCase()]=n; });
+        const nodes=new Map(), edges=[], edgeSet=new Set();
+        const addNode=(key,label,type)=>{ if(!nodes.has(key)) nodes.set(key,{key,label,type,deg:0}); return nodes.get(key); };
+        (notes||[]).forEach(n=>{
+          const links=[...(n.content||'').matchAll(/\[\[([^\]]+)\]\]/g)].map(m=>m[1].trim());
+          if(!links.length) return;
+          const src=addNode('n:'+n.id, n.title||'Naamloze notitie','note');
+          links.forEach(name=>{
+            const lower=name.toLowerCase();
+            let tgt=null;
+            if(coacheeByName[lower]) tgt=addNode('c:'+coacheeByName[lower].id, coacheeByName[lower].name,'coachee');
+            else if(noteByTitle[lower]&&noteByTitle[lower].id!==n.id) tgt=addNode('n:'+noteByTitle[lower].id, noteByTitle[lower].title,'note');
+            if(!tgt) return;
+            const ek=[src.key,tgt.key].sort().join('|');
+            if(edgeSet.has(ek)) return;
+            edgeSet.add(ek); edges.push([src.key,tgt.key]); src.deg++; tgt.deg++;
+          });
+        });
+        const list=[...nodes.values()].filter(n=>n.deg>0);
+        if(!list.length){ wrap.innerHTML='<div class="empty"><div class="big">Nog geen verbindingen</div><p>Typ <b>[[Naam]]</b> in een notitie om een link naar een coachee of andere notitie te leggen \u2014 dan groeit hier vanzelf een web.</p></div>'; return; }
+        // Force-layout
+        const W=1000,H=680;
+        list.forEach((n,i)=>{ const a=i/list.length*Math.PI*2; n.x=W/2+Math.cos(a)*230+(Math.random()*50-25); n.y=H/2+Math.sin(a)*180+(Math.random()*50-25); });
+        const idx=Object.fromEntries(list.map(n=>[n.key,n]));
+        const E=edges.filter(([a,b])=>idx[a]&&idx[b]);
+        for(let it=0;it<220;it++){
+          for(let i=0;i<list.length;i++) for(let j=i+1;j<list.length;j++){
+            const a=list[i],b=list[j]; let dx=a.x-b.x, dy=a.y-b.y; const d2=dx*dx+dy*dy||1; if(d2>50000) continue;
+            const d=Math.sqrt(d2), f=2000/d2; dx/=d; dy/=d;
+            a.x+=dx*f; a.y+=dy*f; b.x-=dx*f; b.y-=dy*f;
+          }
+          E.forEach(([ak,bk])=>{ const a=idx[ak],b=idx[bk]; const dx=b.x-a.x,dy=b.y-a.y; const d=Math.sqrt(dx*dx+dy*dy)||1; const f=(d-120)*0.02; a.x+=dx/d*f; a.y+=dy/d*f; b.x-=dx/d*f; b.y-=dy/d*f; });
+          list.forEach(n=>{ n.x+=(W/2-n.x)*0.003; n.y+=(H/2-n.y)*0.003; });
+        }
+        const lines=E.map(([ak,bk])=>{ const a=idx[ak],b=idx[bk]; return `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="#c9cede" stroke-width="1.4"/>`; }).join('');
+        const dots=list.map(n=>{
+          const r=7+Math.min(n.deg*1.6,12);
+          const col=n.type==='coachee'?'#549E39':'#8a5cff';
+          return `<g style="cursor:pointer;" onclick="kgOpen('${n.key}')"><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${r}" fill="${col}" opacity=".9"/><text x="${n.x.toFixed(1)}" y="${(n.y+r+13).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="600" fill="#3a3f4b">${esc(n.label.length>26?n.label.slice(0,24)+'\u2026':n.label)}</text></g>`;
+        }).join('');
+        wrap.innerHTML=`<div style="position:absolute;top:10px;left:12px;z-index:2;font-size:11.5px;color:var(--ink-faint);background:rgba(255,255,255,.85);border-radius:8px;padding:5px 10px;">\u{1F7E2} coachee &nbsp; \u{1F7E3} notitie &nbsp;\u00b7&nbsp; ${list.length} knopen, ${E.length} verbindingen \u00b7 scroll = zoom, sleep = pan</div>
+          <svg id="kgSvg" viewBox="0 0 ${W} ${H}" style="width:100%;height:100%;">${lines}${dots}</svg>`;
+        // Pan & zoom
+        const svg=wrap.querySelector('#kgSvg');
+        let vb={x:0,y:0,w:W,h:H}, drag=null;
+        const setVB=()=>svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+        svg.addEventListener('wheel',e=>{ e.preventDefault(); const f=e.deltaY>0?1.12:0.89; const nw=Math.min(Math.max(vb.w*f,200),3000); vb.x+=(vb.w-nw)/2; vb.y+=(vb.h-nw*H/W)/2; vb.h=nw*H/W; vb.w=nw; setVB(); },{passive:false});
+        svg.addEventListener('pointerdown',e=>{ drag={sx:e.clientX,sy:e.clientY,vx:vb.x,vy:vb.y}; svg.setPointerCapture(e.pointerId); });
+        svg.addEventListener('pointermove',e=>{ if(!drag) return; const sc=vb.w/svg.clientWidth; vb.x=drag.vx-(e.clientX-drag.sx)*sc; vb.y=drag.vy-(e.clientY-drag.sy)*sc; setVB(); });
+        svg.addEventListener('pointerup',()=>drag=null);
+      }catch(e){ wrap.innerHTML=`<div class="empty"><div class="big">Graaf maken mislukt</div><p>${esc(e.message)}</p></div>`; }
+    });
+  }
+  function kgOpen(key){
+    document.querySelector('.sheet-overlay')?.remove();
+    switchTab(key.startsWith('c:')?'coach':'note');
+  }
+
+  // ================= DEEL MET COACHEE (beveiligde link) =================
+  async function shareWithCoachee(recId){
+    try{
+      const expires=new Date(Date.now()+30*864e5).toISOString();
+      const { data, error }=await sb.from('share_tokens').insert({ recording_id:recId, expires_at:expires }).select('token').single();
+      if(error) throw error;
+      const url=`${SUPABASE_URL}/functions/v1/share-view?t=${data.token}`;
+      await navigator.clipboard.writeText(url);
+      toast('Deellink gekopieerd \u2014 30 dagen geldig \u{1F4CB}');
+    }catch(e){ toast('Deellink maken kon niet \u2014 draai eerst de share-migratie.','err'); }
+  }
+
+  // ================= REALTIME SYNC TUSSEN APPARATEN =================
+  let rtTimer=null;
+  function initRealtime(){
+    try{
+      sb.channel('brain-sync')
+        .on('postgres_changes',{ event:'*', schema:'public' },payload=>{
+          const table=payload.table;
+          const map={ recordings:'rec', notes:'note', inspiration:'insp', book_summaries:'book', documents:'doc', action_items:'rec', appointments:'coach', coachees:'coach' };
+          const tab=map[table];
+          if(!tab||tab!==activeTab) return;
+          // niet verversen terwijl je typt
+          const ae=document.activeElement;
+          if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable)) return;
+          clearTimeout(rtTimer);
+          rtTimer=setTimeout(()=>{ if(typeof load==='function') load(); },1500);
+        })
+        .subscribe();
+    }catch(e){}
+  }
+
+  (async()=>{ const { data:{ session } }=await sb.auth.getSession(); if(session){ showApp(); initRealtime(); } })();
 </script>
 
 <!-- Delete Modal -->
