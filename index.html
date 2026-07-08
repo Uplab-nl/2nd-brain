@@ -243,10 +243,15 @@
   .card-head { padding:20px 22px 16px; display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
   .card-title { font-size:18px; font-weight:500; letter-spacing:-.01em; }
   .card-meta { font-size:12.5px; color:var(--ink-faint); margin-top:3px; font-weight:400; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .nb-tag { font-size:11px; font-weight:500; padding:2px 9px; border-radius:12px; background:var(--bg); color:var(--ink-soft); display:inline-flex; align-items:center; gap:5px; }
+  .nb-tag { font-size:11px; font-weight:500; padding:2px 9px 2px 2px; border-radius:12px; background:var(--bg); color:var(--ink-soft); display:inline-flex; align-items:center; gap:6px; }
   .nb-tag .dot { width:7px; height:7px; border-radius:50%; }
   .co-tag { font-size:11px; font-weight:500; padding:2px 9px; border-radius:12px; background:linear-gradient(135deg,#ede9ff,#ffe9f7); color:var(--purple); display:inline-flex; align-items:center; gap:5px; }
-  .tpl-tag { font-size:11px; font-weight:700; padding:2px 9px; border-radius:12px; background:var(--grad-brand); color:#fff; display:inline-flex; align-items:center; gap:4px; text-transform:uppercase; letter-spacing:.03em; }
+  .tpl-tag { font-size:11px; font-weight:500; padding:2px 9px 2px 2px; border-radius:12px; background:var(--bg); color:var(--ink-soft); display:inline-flex; align-items:center; gap:6px; }
+  .tag-ic { width:17px; height:17px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; color:#fff; }
+  .tag-ic svg { width:10px; height:10px; }
+  .marker-row { display:flex; flex-wrap:wrap; gap:6px; padding:0 16px 10px; }
+  .marker-chip { font-size:12px; font-weight:500; padding:3px 10px; border-radius:12px; background:#fff4e5; color:#b8641a; cursor:pointer; white-space:nowrap; border:1px solid #ffe1b8; }
+  .marker-chip:hover { background:#ffe9c9; }
   .tpl-sec { display:inline-block; font-size:11px; background:var(--bg); color:var(--ink-soft); padding:2px 9px; border-radius:10px; margin:2px 3px 0 0; }
   .bk-cover { width:38px; height:52px; border-radius:5px; background:var(--grad-brand); flex-shrink:0; box-shadow:var(--shadow-sm); position:relative; }
   .bk-cover::after { content:''; position:absolute; left:5px; top:6px; bottom:6px; width:2px; background:rgba(255,255,255,.4); border-radius:2px; }
@@ -608,6 +613,7 @@
       <div class="block-toolbar">
         <button class="act" onclick="openUploadPopup()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#ff6b5a,#ff5a8a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg></span>Bestand uploaden</button>
         <button class="act" onclick="openLiveRec()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#ff6b5a,#ff5a8a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v4"/></svg></span>Direct opnemen</button>
+        <button class="act" onclick="openVoiceGPT()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#549E39,#7ac142)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.8-.9L3 20l1.1-4.3a8.4 8.4 0 0 1 15.9-4.2z"/></svg></span>Spar met GPT (voice)</button>
         <div class="menu-wrap">
           <button class="menu-btn" onclick="toggleMenu('recMenu')" title="Meer opties">&#9776;</button>
           <div class="dropdown-menu hidden" id="recMenu">
@@ -1047,6 +1053,24 @@
     const wrap=document.getElementById('audio-'+recId);
     wrap.innerHTML=`<audio controls autoplay src="${data.signedUrl}"></audio>`;
     btn.remove();
+  }
+  // Klik op een vlag \u2014 laadt de audio (indien nog niet geladen) en springt naar dat exacte moment
+  async function playAudioAt(recId,seconds){
+    const wrap=document.getElementById('audio-'+recId);
+    let audioEl=wrap?.querySelector('audio');
+    if(!audioEl){
+      const { data:rec }=await sb.from('recordings').select('audio_path').eq('id',recId).single();
+      if(!rec?.audio_path){ toast('Geen audio gevonden.'); return; }
+      const { data, error }=await sb.storage.from('Recordings').createSignedUrl(rec.audio_path,3600);
+      if(error){ toast('Kon audio niet laden: '+error.message); return; }
+      wrap.innerHTML=`<audio controls src="${data.signedUrl}"></audio>`;
+      audioEl=wrap.querySelector('audio');
+      document.querySelector(`[data-rec-id="${recId}"] .play-mini`)?.remove();
+      audioEl.addEventListener('loadedmetadata',()=>{ audioEl.currentTime=seconds; audioEl.play(); },{ once:true });
+    } else {
+      audioEl.currentTime=seconds;
+      audioEl.play();
+    }
   }
   let notebooks=[], allNotebooks=[], coachees=[], templates=[], activeNB='all', activeTab='dash';
 
@@ -1573,6 +1597,9 @@
     hamburger:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`,
     download:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m7 11 5 5 5-5"/><path d="M4 19.5V20a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-.5"/></svg>`,
     undo:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`,
+    book:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+    bucket:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.4 11.2a2 2 0 0 1-2 1.8H8.4a2 2 0 0 1-2-1.8z"/><path d="M5 8a7 3.2 0 0 1 14 0"/></svg>`,
+    sheet:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`,
   };
   const COL={ rec:'linear-gradient(135deg,#ff6b5a,#ff5a8a)', note:'linear-gradient(135deg,#ff5adb,#ff9f43)', map:'linear-gradient(135deg,#7367f0,#5a9cff)', book:'linear-gradient(135deg,#ff9f43,#ff6b5a)', doc:'linear-gradient(135deg,#3b82f6,#6366f1)', danger:'linear-gradient(135deg,#ff6b5a,#e05252)', neutral:'linear-gradient(135deg,#9aa3b2,#6b7280)', dain:'var(--grad-purple)', green:'linear-gradient(135deg,#549E39,#7ac142)', coach:'linear-gradient(135deg,#5a9cff,#7367f0)' };
 
@@ -1615,19 +1642,21 @@
     if(r.status==='summarized') menuItems+=`<button class="act" onclick="event.stopPropagation();shareWithCoachee('${r.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.link)}Deel met coachee</button>`;
     menuItems+=`<button class="act" onclick="shareItem('recording','${r.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>`;
     menuItems+=`<button class="act danger" onclick="askDeleteRecording('${r.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
-    const nbTags=notebookIds.map(id=>nbById(id)).filter(Boolean).map(nb=>`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`).join('');
+    const nbTags=notebookIds.map(id=>nbById(id)).filter(Boolean).map(nb=>`<span class="nb-tag"><span class="tag-ic" style="background:${nb.color||'#8a5cff'}">${ICO.book}</span>${esc(nb.name)}</span>`).join('');
     const tpl=templates.find(t=>t.id===r.template_id);
-    const tplTag=tpl?`<span class="tpl-tag">\u25A4 ${esc(tpl.name)}</span>`:'';
+    const tplTag=tpl?`<span class="tpl-tag"><span class="tag-ic" style="background:var(--purple)">${ICO.sheet}</span>${esc(tpl.name)}</span>`:'';
     const coTags=coacheeIds.map(id=>coachees.find(c=>c.id===id)).filter(Boolean).map(co=>`<span class="co-tag">\u{1F464} ${esc(co.name)}</span>`).join('');
-    const bkTags=bucketIds.map(id=>recBuckets.find(x=>x.id===id)).filter(Boolean).map(bk=>`<span class="nb-tag"><span class="dot" style="background:${bk.color}"></span>${esc(bk.name)}</span>`).join('');
+    const bkTags=bucketIds.map(id=>recBuckets.find(x=>x.id===id)).filter(Boolean).map(bk=>`<span class="nb-tag"><span class="tag-ic" style="background:${bk.color||'#5a9cff'}">${ICO.bucket}</span>${esc(bk.name)}</span>`).join('');
     const playBtn=`<button class="play-mini" title="Beluister opname" onclick="event.stopPropagation();playAudio('${r.id}',this)">\u25B6</button>`;
     const previewTxt=preview2((sectionRows[0]?.content)||summary||'');
     const audioRow=`<div class="audio-row" id="audio-${r.id}"></div>`;
+    const markers=(r.recording_markers||[]).slice().sort((a,b)=>a.seconds-b.seconds);
+    const markersRow=markers.length?`<div class="marker-row" onclick="event.stopPropagation()">${markers.map(m=>`<span class="marker-chip" onclick="playAudioAt('${r.id}',${m.seconds})" title="${esc(m.note||'Spring naar dit moment')}">\u{1F6A9} ${fmtTime(m.seconds)}${m.note?' \u2013 '+esc(m.note):''}</span>`).join('')}</div>`:'';
     return `<article class="card collapsible" id="rec-${r.id}" data-rec-id="${r.id}" onclick="toggleCard(this)">
       <div class="card-head">
         <div style="display:flex;align-items:flex-start;gap:12px;flex:1;">
           ${playBtn}
-          <div><div class="card-title">${esc(r.title||'Naamloze opname')} <button class="rename-btn" onclick="event.stopPropagation();renameRecording('${r.id}','${escJs(r.title||'')}')" title="Titel wijzigen">\u270E</button>${r.title_is_auto?`<span class="tpl-tag" style="margin-left:4px;" title="Dain past deze titel automatisch aan zodra hij opnieuw analyseert \u2014 totdat je 'm zelf wijzigt">\u2728 auto-titel</span>`:''}</div><div class="card-meta">${when} \u00b7 ${esc(r.source)} ${nbTags} ${coTags} ${tplTag} ${bkTags}</div></div>
+          <div><div class="card-title">${esc(r.title||'Naamloze opname')} <button class="rename-btn" onclick="event.stopPropagation();renameRecording('${r.id}','${escJs(r.title||'')}')" title="Titel wijzigen">\u270E</button></div><div class="card-meta">${when} \u00b7 ${esc(r.source)} ${nbTags} ${coTags} ${tplTag} ${bkTags}</div></div>
         </div>
         ${starHTML('recordings',r.id,r.favorite)}
         ${cardMenuHTML(menuId,menuItems)}
@@ -1636,6 +1665,7 @@
       </div>
       ${previewTxt?`<div class="card-preview">${previewTxt}</div>`:''}
       ${audioRow}
+      ${markersRow}
       <div class="card-body" onclick="event.stopPropagation()">${body}</div>
       <div class="card-actions" onclick="event.stopPropagation()">${btns}</div>
     </article>`;
@@ -1718,7 +1748,7 @@
   async function loadRecordings(){
     renderRecBucketBar();
     await refreshVrIds();
-    let q=sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)',{count:'exact'}).neq('status','deleted').order('created_at',{ascending:false}).limit(recLimit);
+    let q=sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done), recording_markers(id, seconds, note)',{count:'exact'}).neq('status','deleted').order('created_at',{ascending:false}).limit(recLimit);
     if(activeNB!=='all'){
       const nbIds=await itemIdsForLinkValues('recording_notebook_links','recording_id','notebook_id',nbWithDescendants(activeNB));
       q=q.in('id',nbIds.length?nbIds:['00000000-0000-0000-0000-000000000000']);
@@ -3896,7 +3926,7 @@
     const [recsR, notesR, actR, coachR, bookR, mapR]=await Promise.all([
       sb.from('recordings').select('id,title,status,created_at').neq('status','deleted').order('created_at',{ascending:false}).limit(5),
       sb.from('notes').select('id,title,content,created_at').is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false}).limit(5),
-      sb.from('action_items').select('id,content,done,created_at,due_date,recording_id').order('created_at',{ascending:false}),
+      sb.from('action_items').select('id,content,done,created_at,due_date,recording_id,recordings(title)').order('created_at',{ascending:false}),
       sb.from('coachees').select('id',{count:'exact',head:true}),
       sb.from('book_summaries').select('id',{count:'exact',head:true}),
       sb.from('mindmaps').select('id',{count:'exact',head:true}).neq('status','deleted'),
@@ -4070,7 +4100,7 @@
         rows+=`<div class="section-label transcript-toggle" onclick="toggleDashFold('doneActions')" style="cursor:pointer;margin-top:10px;"><span>Voltooid (${done.length}) <span id="doneActionsCaret">\u25B8</span></span></div><div id="doneActionsBox" class="hidden">${done.map(a=>actionRowHTML(a)).join('')}</div>`;
       }
       if(!open.length && !done.length) rows='<div class="db-empty">Geen acties \u2014 lekker bezig \u2728</div>';
-      inner=`<div class="db-title">Acties</div>${rows}`;
+      inner=`<div class="db-title" style="display:flex;align-items:center;justify-content:space-between;"><span>Acties</span><button class="act" onclick="openAddAction()" title="Actie toevoegen" style="padding:3px 12px;">+ Actie</button></div>${rows}`;
     }
     else if(id==='duesoon'){
       const in7=new Date(); in7.setDate(in7.getDate()+7); in7.setHours(23,59,59,999);
@@ -4137,16 +4167,55 @@
     return `<span class="due-badge later">${label}</span>`;
   }
   function actionRowHTML(a){
-    return `<div class="db-action ${a.done?'done':''}" id="da-${a.id}">
-      <div class="db-check ${a.done?'done':''}" onclick="toggleAction('${a.id}')"></div>
+    const recTitle=a.recordings?.title;
+    const clickAttr=a.recording_id?` onclick="openActionSource('${a.recording_id}')" style="cursor:pointer;"`:'';
+    return `<div class="db-action ${a.done?'done':''}" id="da-${a.id}"${clickAttr}>
+      <div class="db-check ${a.done?'done':''}" onclick="event.stopPropagation();toggleAction('${a.id}')"></div>
       <div style="flex:1;">
         <div class="db-action-txt">${esc(a.content)}</div>
+        ${a.recording_id?`<div class="db-action-src" style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">\u{1F3A4} ${esc(recTitle||'Opname')}</div>`:''}
         <div class="db-action-due">
-          <input type="date" class="db-due-input" value="${a.due_date||''}" onchange="setActionDue('${a.id}',this.value)" onclick="event.stopPropagation()" title="Deadline instellen">
+          <input type="date" class="db-due-input" value="${a.due_date||''}" onchange="event.stopPropagation();setActionDue('${a.id}',this.value)" onclick="event.stopPropagation()" title="Deadline instellen">
           <span id="duebadge-${a.id}">${dueBadge(a.due_date)}</span>
         </div>
       </div>
     </div>`;
+  }
+  // Klik op een actie \u2014 spring naar de opname waar hij uit gepikt is, zodat je de context/het gesprek terugziet
+  function openActionSource(recId){
+    if(!recId) return;
+    document.querySelector('.sheet-overlay')?.remove();
+    openSearchResult('rec',recId);
+  }
+  // Los actiepunt toevoegen vanuit het dashboard, zonder koppeling aan een opname
+  function openAddAction(){
+    const body=`
+      <label style="text-align:left;">Actie</label>
+      <input type="text" id="newActionText" placeholder="Bijv. Boek de volgende sessie in" style="width:100%;">
+      <label style="text-align:left;margin-top:10px;">Deadline (optioneel)</label>
+      <input type="date" id="newActionDue" style="width:100%;">
+      <div class="sheet-actions">
+        <button class="act" id="naCancel">Annuleren</button>
+        <button class="act primary" id="naSave">Toevoegen</button>
+      </div>`;
+    openSheet('\u2795 Actie toevoegen', body, (ov,close)=>{
+      const input=ov.querySelector('#newActionText'); input.focus();
+      ov.querySelector('#naCancel').onclick=close;
+      const save=async()=>{
+        const text=input.value.trim();
+        if(!text){ toast('Vul eerst een actie in.'); return; }
+        const due=ov.querySelector('#newActionDue').value||null;
+        const { data:{ user } }=await sb.auth.getUser();
+        const { data, error }=await sb.from('action_items').insert({ user_id:user.id, content:text, done:false, due_date:due, recording_id:null }).select('id,content,done,created_at,due_date,recording_id').single();
+        if(error){ toast('Toevoegen mislukt: '+error.message); return; }
+        dashData.actions.unshift(data);
+        close();
+        renderDash();
+        toast('Actie toegevoegd \u2713');
+      };
+      ov.querySelector('#naSave').onclick=save;
+      input.addEventListener('keydown',e=>{ if(e.key==='Enter') save(); });
+    });
   }
   async function setActionDue(id,value){
     const a=dashData.actions.find(x=>x.id===id); if(!a) return;
@@ -4449,7 +4518,7 @@
         const bk=(await loadBucketLinksFor('note_bucket_links','note_id',[id]))[id];
         html=noteCardHTML(n,att,bk);
       } else if(kind==='rec'){
-        const { data:r }=await sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)').eq('id',id).maybeSingle();
+        const { data:r }=await sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done), recording_markers(id, seconds, note)').eq('id',id).maybeSingle();
         if(!r) throw new Error('niet gevonden');
         await refreshVrIds();
         html=recCardHTML(r);
@@ -4679,7 +4748,7 @@
   // ============================================================
   //  LIVE OPNAME (neem direct op in de browser + aantekeningen)
   // ============================================================
-  let liveMedia=null, liveChunks=[], liveTimer=null, liveSeconds=0, liveStream=null;
+  let liveMedia=null, liveChunks=[], liveTimer=null, liveSeconds=0, liveStream=null, liveMarkers=[];
   function fmtTime(sec){ const m=Math.floor(sec/60), s=sec%60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
 
   let liveApptId=null;
@@ -4711,6 +4780,7 @@
     liveNbIds=(activeNB && activeNB!=='all')?[activeNB]:[];
     liveCoIds=preselectCoacheeId?[preselectCoacheeId]:[];
     liveBkIds=(activeRecBucket && activeRecBucket!=='all')?[activeRecBucket]:[];
+    liveMarkers=[];
     const preCo=coachees.find(c=>c.id===preselectCoacheeId);
     const defaultTitle=preCo?`Sessie met ${preCo.name}`:'';
     const body=`
@@ -4718,6 +4788,8 @@
         <div class="rec-timer" id="liveTimer">00:00</div>
         <div class="rec-dot" id="liveDot" onclick="toggleLiveRec()">\u{1F3A4}</div>
         <div id="liveState" style="font-size:13px;color:var(--ink-faint);margin-bottom:12px;">Klik om te starten</div>
+        <button class="act" id="liveFlagBtn" onclick="liveAddMarker()" style="margin:0 auto 12px;display:inline-flex;">\u{1F6A9} Vlag dit moment</button>
+        <div id="liveMarkersList" style="text-align:left;margin-bottom:10px;"></div>
         <label style="text-align:left;">Titel</label>
         <input type="text" id="liveTitle" placeholder="Bijv. Sessie met \u2026" value="${esc(defaultTitle)}">
         <div id="liveLinksRow" style="margin-top:12px;">${liveLinksRowHTML()}</div>
@@ -4730,16 +4802,34 @@
       </div>`;
     openSheet('\u{1F534} Direct opnemen', body, (ov,close)=>{
       rewireLiveLinks(ov);
+      renderLiveMarkers();
       $('liveCancel').onclick=()=>{ stopLiveTracks(); close(); };
       $('liveSave').onclick=()=>saveLiveRec(close);
       ov._closed=()=>stopLiveTracks();
     });
   }
 
+  // Vlag plaatsen op het huidige moment in de live opname \u2014 handig om tijdens een meeting
+  // een specifiek punt te markeren, met eventueel een kort label erbij (typen mag ondertussen doorlopen).
+  function liveAddMarker(){
+    if(!liveMedia || liveMedia.state!=='recording'){ toast('Start eerst de opname om een vlag te kunnen plaatsen.'); return; }
+    liveMarkers.push({ seconds:liveSeconds, note:'' });
+    renderLiveMarkers();
+  }
+  function renderLiveMarkers(){
+    const box=$('liveMarkersList'); if(!box) return;
+    if(!liveMarkers.length){ box.innerHTML=''; return; }
+    box.innerHTML=liveMarkers.map((m,i)=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="font-size:12.5px;font-weight:700;color:#b8641a;white-space:nowrap;">\u{1F6A9} ${fmtTime(m.seconds)}</span>
+        <input type="text" value="${esc(m.note)}" placeholder="Waar ging dit over? (optioneel)" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--line);border-radius:9px;" oninput="liveMarkers[${i}].note=this.value">
+      </div>`).join('');
+  }
+
   function stopLiveTracks(){
     if(liveTimer){ clearInterval(liveTimer); liveTimer=null; }
     if(liveStream){ liveStream.getTracks().forEach(t=>t.stop()); liveStream=null; }
-    liveMedia=null; liveChunks=[]; liveSeconds=0;
+    liveMedia=null; liveChunks=[]; liveSeconds=0; liveMarkers=[];
   }
 
   async function toggleLiveRec(){
@@ -4783,6 +4873,7 @@
       if(liveNbIds.length) await setLinks('recording_notebook_links','recording_id',rec.id,'notebook_id',liveNbIds);
       if(liveCoIds.length) await setLinks('recording_coachee_links','recording_id',rec.id,'coachee_id',liveCoIds);
       if(liveBkIds.length) await setBucketLinks('recording_bucket_links','recording_id',rec.id,liveBkIds);
+      if(liveMarkers.length) await sb.from('recording_markers').insert(liveMarkers.map(m=>({ user_id:user.id, recording_id:rec.id, seconds:m.seconds, note:m.note||'' })));
     }
     const notes=$('liveNotes').value.trim();
     if(notes){ await sb.from('notes').insert({ user_id:user.id, title:'Aantekeningen: '+title, content:notes, notebook_id:nb, coachee_id:co, recording_id:rec.id }); }
@@ -4790,6 +4881,193 @@
     liveApptId=null;
     if(!currentTimelineCoachee) switchTab('rec');
     if(rec){ startTranscribe(rec.id, { disabled:false, textContent:'' }); }
+  }
+
+  // ============================================================
+  //  SPAR MET GPT (VOICE) \u2014 live spraakgesprek met OpenAI's Realtime API.
+  //  Zeg "sla dit op in mijn tweede brein" en GPT roept zelf de tool aan
+  //  die het transcript + samenvatting als notitie opslaat.
+  // ============================================================
+  let vgPc=null, vgDc=null, vgStream=null, vgAudioEl=null;
+  let vgTranscript=[], vgNbIds=[], vgCoIds=[], vgBkIds=[], vgSavedNoteId=null;
+  let vgTimer=null, vgSeconds=0;
+
+  function vgLinksRowHTML(){
+    const labelFor=(ids,list)=>ids.length?(ids.map(x=>list.find(o=>o.id===x)?.name).filter(Boolean).join(', ')||'Niet gekozen'):'Niet gekozen';
+    const row=(id,title,label)=>`<button class="act" id="${id}" style="width:100%;justify-content:space-between;margin-bottom:8px;text-align:left;">${mi(COL.neutral,ICO.link)}<span style="flex:1;margin-left:8px;">${title}</span><span style="color:var(--ink-faint);font-size:12px;font-weight:400;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(label)}</span></button>`;
+    return row('vgNbBtn','Notitieboek',labelFor(vgNbIds,notebooks))+row('vgCoBtn','Coachee',labelFor(vgCoIds,coachees))+row('vgBkBtn','Bucket',labelFor(vgBkIds,recBuckets));
+  }
+  function refreshVgLinks(ov){ ov.querySelector('#vgLinksRow').innerHTML=vgLinksRowHTML(); rewireVgLinks(ov); }
+  function rewireVgLinks(ov){
+    ov.querySelector('#vgNbBtn').onclick=()=>{ openNotebookTreePicker(vgNbIds,sel=>{ vgNbIds=sel; refreshVgLinks(ov); }); };
+    ov.querySelector('#vgCoBtn').onclick=()=>{ openCoacheeMultiPicker(vgCoIds,sel=>{ vgCoIds=sel; refreshVgLinks(ov); }); };
+    ov.querySelector('#vgBkBtn').onclick=()=>{ openBucketPicker('\u{1F5C2} Buckets kiezen',recBuckets,vgBkIds,sel=>{ vgBkIds=sel; refreshVgLinks(ov); }); };
+  }
+
+  function openVoiceGPT(preselectCoacheeId){
+    vgNbIds=(activeNB && activeNB!=='all')?[activeNB]:[];
+    vgCoIds=preselectCoacheeId?[preselectCoacheeId]:[];
+    vgBkIds=[];
+    vgTranscript=[]; vgSavedNoteId=null; vgSeconds=0;
+    const body=`
+      <div class="rec-live">
+        <div class="rec-timer" id="vgTimer">00:00</div>
+        <div class="rec-dot" id="vgDot" style="background:linear-gradient(135deg,#549E39,#7ac142);">\u{1F399}\uFE0F</div>
+        <div id="vgStatus" style="font-size:13px;color:var(--ink-faint);margin-bottom:12px;">Klik op Start om te bellen met GPT</div>
+        <div id="vgLinksRow" style="margin-top:4px;">${vgLinksRowHTML()}</div>
+        <div id="vgTranscriptBox" style="text-align:left;max-height:220px;overflow-y:auto;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:12px;font-size:13.5px;color:var(--ink-soft);"><span style="color:var(--ink-faint);">Het gesprek verschijnt hier live zodra je begint.</span></div>
+        <div class="sheet-actions">
+          <button class="act" id="vgCancel">Sluiten</button>
+          <button class="act" id="vgManualSaveBtn" onclick="vgManualSave()">Alsnog opslaan</button>
+          <button class="act primary" id="vgStartBtn" onclick="vgStart()">Start gesprek</button>
+          <button class="act primary hidden" id="vgStopBtn" onclick="vgStop()">Be\u00ebindig gesprek</button>
+        </div>
+      </div>`;
+    openSheet('\u{1F399}\uFE0F Spar met GPT (voice)', body, (ov,close)=>{
+      rewireVgLinks(ov);
+      $('vgCancel').onclick=()=>{ vgStopTracks(); close(); };
+      ov._closed=()=>vgStopTracks();
+    });
+  }
+
+  function vgInstructions(){
+    return `Je bent een informele, scherpe sparringpartner voor Daan, een coach die werkt met Unleash Potential Lab. Voer een natuurlijk gesprek in het Nederlands, stel goede vervolgvragen, en help hem hardop denken.
+Als Daan op enig moment aangeeft dat je het gesprek moet bewaren \u2014 bijvoorbeeld "sla dit op", "bewaar dit gesprek", "zet dit in mijn tweede brein" \u2014 roep dan direct de functie save_to_second_brain aan met een korte titel en een beknopte samenvatting van waar het gesprek over ging. Bevestig daarna kort en mondeling dat het is opgeslagen.`;
+  }
+
+  function vgOnDataChannelOpen(){
+    vgSendEvent({
+      type:'session.update',
+      session:{
+        type:'realtime',
+        model:'gpt-realtime-2.1',
+        instructions:vgInstructions(),
+        tools:[{
+          type:'function',
+          name:'save_to_second_brain',
+          description:'Roep dit aan zodra de gebruiker vraagt om het gesprek op te slaan in zijn tweede brein.',
+          parameters:{
+            type:'object',
+            properties:{
+              title:{ type:'string', description:'Een korte titel voor dit gesprek (max 8 woorden)' },
+              summary:{ type:'string', description:'Een beknopte samenvatting van het gesprek, in het Nederlands' },
+            },
+            required:['summary'],
+          },
+        }],
+        tool_choice:'auto',
+      },
+    });
+    const st=$('vgStatus'); if(st) st.textContent='Verbonden \u2014 praat maar! Zeg "sla dit op" om te bewaren.';
+  }
+
+  function vgSendEvent(ev){ if(vgDc && vgDc.readyState==='open') vgDc.send(JSON.stringify(ev)); }
+
+  function vgRenderTranscript(){
+    const box=$('vgTranscriptBox'); if(!box) return;
+    box.innerHTML=(vgTranscript.length?vgTranscript.map(t=>`<div style="margin-bottom:8px;"><strong>${esc(t.role)}:</strong> ${esc(t.text)}</div>`).join(''):'<span style="color:var(--ink-faint);">Het gesprek verschijnt hier live zodra je begint.</span>')
+      +(vgSavedNoteId?`<div style="margin-top:8px;color:#549E39;font-weight:600;">\u2713 Opgeslagen in je tweede brein</div>`:'');
+    box.scrollTop=box.scrollHeight;
+  }
+
+  function vgHandleMessage(e){
+    let ev; try{ ev=JSON.parse(e.data); }catch(_e){ return; }
+    if(ev.type==='conversation.item.input_audio_transcription.completed' && ev.transcript){
+      vgTranscript.push({ role:'Jij', text:ev.transcript }); vgRenderTranscript();
+    } else if(ev.type==='response.output_audio_transcript.done' && ev.transcript){
+      vgTranscript.push({ role:'GPT', text:ev.transcript }); vgRenderTranscript();
+    } else if(ev.type==='response.done'){
+      const out=ev.response?.output||[];
+      out.forEach(item=>{ if(item.type==='function_call' && item.name==='save_to_second_brain') vgHandleSaveCall(item); });
+    }
+  }
+
+  async function vgHandleSaveCall(item){
+    let args={}; try{ args=JSON.parse(item.arguments||'{}'); }catch(_e){}
+    const ok=await vgSaveToSecondBrain(args.title,args.summary);
+    vgSendEvent({ type:'conversation.item.create', item:{ type:'function_call_output', call_id:item.call_id, output:JSON.stringify(ok?{status:'opgeslagen'}:{status:'mislukt'}) } });
+    vgSendEvent({ type:'response.create' });
+  }
+
+  // Slaat het gesprek op als notitie \u2014 zelfde koppel-patroon (notitieboek/coachee/bucket) als overal elders.
+  async function vgSaveToSecondBrain(titleArg,summaryArg){
+    try{
+      const { data:{ user } }=await sb.auth.getUser();
+      const transcriptText=vgTranscript.map(t=>`${t.role}: ${t.text}`).join('\n\n');
+      const content=(summaryArg?summaryArg+'\n\n---\n\n':'')+(transcriptText||'(geen transcript beschikbaar)');
+      const title=titleArg||('GPT voice-gesprek '+new Date().toLocaleDateString('nl-NL'));
+      const nb=vgNbIds[0]||null, co=vgCoIds[0]||null;
+      const { data:note, error }=await sb.from('notes').insert({ user_id:user.id, title, content, notebook_id:nb, coachee_id:co }).select().single();
+      if(error) throw error;
+      if(vgNbIds.length) await setLinks('note_notebook_links','note_id',note.id,'notebook_id',vgNbIds);
+      if(vgCoIds.length) await setLinks('note_coachee_links','note_id',note.id,'coachee_id',vgCoIds);
+      if(vgBkIds.length) await setBucketLinks('note_bucket_links','note_id',note.id,vgBkIds);
+      embedContent('notes',note.id);
+      vgSavedNoteId=note.id;
+      vgRenderTranscript();
+      toast('Opgeslagen in je tweede brein \u2713');
+      return true;
+    }catch(e){
+      toast('Opslaan mislukt: '+e.message);
+      return false;
+    }
+  }
+
+  // Vangnet: handmatig alsnog opslaan, voor als GPT de tool-aanroep een keer mist
+  async function vgManualSave(){
+    if(!vgTranscript.length){ toast('Nog geen gesprek om op te slaan.'); return; }
+    await vgSaveToSecondBrain(null,null);
+  }
+
+  function vgStopTracks(){
+    clearInterval(vgTimer); vgTimer=null;
+    if(vgStream){ vgStream.getTracks().forEach(t=>t.stop()); vgStream=null; }
+    if(vgPc){ vgPc.close(); vgPc=null; }
+    vgDc=null;
+  }
+
+  async function vgStart(){
+    const dot=$('vgDot'), st=$('vgStatus');
+    if(st) st.textContent='Verbinden\u2026';
+    if(dot) dot.classList.add('recording');
+    try{
+      const { data, error }=await sb.functions.invoke('voice-realtime-token');
+      if(error || !data?.value) throw new Error(data?.error||error?.message||'kon geen token krijgen');
+      const EPHEMERAL_KEY=data.value;
+      vgPc=new RTCPeerConnection();
+      vgAudioEl=document.createElement('audio'); vgAudioEl.autoplay=true;
+      vgPc.ontrack=e=>{ vgAudioEl.srcObject=e.streams[0]; };
+      vgStream=await navigator.mediaDevices.getUserMedia({ audio:true });
+      vgPc.addTrack(vgStream.getTracks()[0]);
+      vgDc=vgPc.createDataChannel('oai-events');
+      vgDc.addEventListener('message',vgHandleMessage);
+      vgDc.addEventListener('open',vgOnDataChannelOpen);
+      const offer=await vgPc.createOffer();
+      await vgPc.setLocalDescription(offer);
+      const sdpResp=await fetch('https://api.openai.com/v1/realtime/calls',{
+        method:'POST', body:offer.sdp,
+        headers:{ Authorization:`Bearer ${EPHEMERAL_KEY}`, 'Content-Type':'application/sdp' },
+      });
+      if(!sdpResp.ok) throw new Error('Verbinden met OpenAI mislukt');
+      const answerSdp=await sdpResp.text();
+      await vgPc.setRemoteDescription({ type:'answer', sdp:answerSdp });
+      vgTimer=setInterval(()=>{ vgSeconds++; const t=$('vgTimer'); if(t) t.textContent=fmtTime(vgSeconds); },1000);
+      $('vgStartBtn')?.classList.add('hidden');
+      $('vgStopBtn')?.classList.remove('hidden');
+    }catch(e){
+      toast('Kon geen voice-gesprek starten: '+e.message);
+      vgStopTracks();
+      if(st) st.textContent='Klik op Start om te bellen met GPT';
+      if(dot) dot.classList.remove('recording');
+    }
+  }
+
+  function vgStop(){
+    vgStopTracks();
+    const dot=$('vgDot'); if(dot) dot.classList.remove('recording');
+    const st=$('vgStatus'); if(st) st.textContent='Gesprek be\u00ebindigd';
+    $('vgStartBtn')?.classList.remove('hidden');
+    $('vgStopBtn')?.classList.add('hidden');
   }
 
   // ============================================================
