@@ -174,7 +174,7 @@
   .mn-del { background:linear-gradient(135deg,#ff6b5a,#ff5a8a); }
   .mn-collapse { position:absolute; bottom:-12px; left:50%; transform:translateX(-50%); width:22px; height:22px; border-radius:50%; background:var(--ink-soft); color:#fff; border:none; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:3; }
   .dash-toolbar { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:18px; flex-wrap:wrap; }
-  .dash-hint { font-size:12.5px; color:var(--ink-faint); font-weight:300; }
+  .dash-hint { font-size:17px; font-weight:700; letter-spacing:-.02em; color:var(--ink); }
   .dash-settings { background:var(--card); border-radius:14px; box-shadow:var(--shadow-sm); padding:14px 18px; margin-bottom:18px; display:flex; flex-direction:column; gap:6px; }
   .dash-settings-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .dash-settings-row .dsr-name { font-size:13px; font-weight:600; color:var(--ink); min-width:150px; flex:1; }
@@ -1213,13 +1213,19 @@
     body.innerHTML='<div class="empty"><div class="big">Laden…</div></div>';
     const wantAll=nbView==='all';
     if((wantAll||nbView==='map') && !mmBuckets.length) await loadMmBuckets();
+    const noteIdsForNb=(wantAll||nbView==='note')?await itemIdsForLinkValues('note_notebook_links','note_id','notebook_id',ids):[];
+    const recIdsForNb=(wantAll||nbView==='rec')?await itemIdsForLinkValues('recording_notebook_links','recording_id','notebook_id',ids):[];
+    const bookIdsForNb=(wantAll||nbView==='book')?await itemIdsForLinkValues('book_notebook_links','book_id','notebook_id',ids):[];
+    const inspIdsForNb=(wantAll||nbView==='insp')?await itemIdsForLinkValues('inspiration_notebook_links','inspiration_id','notebook_id',ids):[];
+    const docIdsForNb=(wantAll||nbView==='doc')?await itemIdsForLinkValues('document_notebook_links','document_id','notebook_id',ids):[];
+    const EMPTY_ID=['00000000-0000-0000-0000-000000000000'];
     const [recs,notes,maps,books,insp,docs]=await Promise.all([
-      (wantAll||nbView==='rec')?sb.from('recordings').select('*,transcripts(id),summaries(kind,title,content,sort_order),action_items(content,done)').in('notebook_id',ids).neq('status','deleted').order('created_at',{ascending:false}):Promise.resolve({data:[]}),
-      (wantAll||nbView==='note')?sb.from('notes').select('*').in('notebook_id',ids).is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false}):Promise.resolve({data:[]}),
+      (wantAll||nbView==='rec')?sb.from('recordings').select('*,transcripts(id),summaries(kind,title,content,sort_order),action_items(content,done)').in('id',recIdsForNb.length?recIdsForNb:EMPTY_ID).neq('status','deleted').order('created_at',{ascending:false}):Promise.resolve({data:[]}),
+      (wantAll||nbView==='note')?sb.from('notes').select('*').in('id',noteIdsForNb.length?noteIdsForNb:EMPTY_ID).is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false}):Promise.resolve({data:[]}),
       (wantAll||nbView==='map')?sb.from('mindmaps').select('*').in('notebook_id',ids).neq('status','deleted').order('updated_at',{ascending:false}):Promise.resolve({data:[]}),
-      (wantAll||nbView==='book')?sb.from('book_summaries').select('*').in('notebook_id',ids).order('created_at',{ascending:false}):Promise.resolve({data:[]}),
-      (wantAll||nbView==='insp')?sb.from('inspiration').select('*').in('notebook_id',ids).order('created_at',{ascending:false}):Promise.resolve({data:[]}),
-      (wantAll||nbView==='doc')?sb.from('documents').select('*').in('notebook_id',ids).neq('status','deleted').order('created_at',{ascending:false}):Promise.resolve({data:[]}),
+      (wantAll||nbView==='book')?sb.from('book_summaries').select('*').in('id',bookIdsForNb.length?bookIdsForNb:EMPTY_ID).order('created_at',{ascending:false}):Promise.resolve({data:[]}),
+      (wantAll||nbView==='insp')?sb.from('inspiration').select('*').in('id',inspIdsForNb.length?inspIdsForNb:EMPTY_ID).order('created_at',{ascending:false}):Promise.resolve({data:[]}),
+      (wantAll||nbView==='doc')?sb.from('documents').select('*').in('id',docIdsForNb.length?docIdsForNb:EMPTY_ID).neq('status','deleted').order('created_at',{ascending:false}):Promise.resolve({data:[]}),
     ]);
     let html='';
     (notes.data||[]).forEach(n=>html+=noteCardHTML(n));
@@ -1298,27 +1304,43 @@
 
   async function deleteNB(id){
     const nb=nbById(id); if(!nb) return;
-    // Tel wat er in zit (inclusief submappen)
+    // Tel wat er in zit (inclusief submappen) — via de link-tabellen, want alles kan nu aan meerdere notitieboeken hangen
     const ids=nbWithDescendants(id);
-    const { count:recCount }=await sb.from('recordings').select('id',{count:'exact',head:true}).in('notebook_id',ids);
-    const { count:noteCount }=await sb.from('notes').select('id',{count:'exact',head:true}).in('notebook_id',ids);
+    const [noteIdsInNb,recIdsInNb,bookIdsInNb,inspIdsInNb,docIdsInNb]=await Promise.all([
+      itemIdsForLinkValues('note_notebook_links','note_id','notebook_id',ids),
+      itemIdsForLinkValues('recording_notebook_links','recording_id','notebook_id',ids),
+      itemIdsForLinkValues('book_notebook_links','book_id','notebook_id',ids),
+      itemIdsForLinkValues('inspiration_notebook_links','inspiration_id','notebook_id',ids),
+      itemIdsForLinkValues('document_notebook_links','document_id','notebook_id',ids),
+    ]);
+    const noteCount=noteIdsInNb.length, recCount=recIdsInNb.length;
     const subCount=ids.length-1;
-    const total=(recCount||0)+(noteCount||0);
+    const total=recCount+noteCount+bookIdsInNb.length+inspIdsInNb.length+docIdsInNb.length;
 
     let msg=`Notitieboek "${nb.name}" verwijderen?`;
     if(subCount>0) msg+=`\n\nLet op: dit bevat ${subCount} submap${subCount===1?'':'pen'} die ook verdwijnen.`;
     if(total>0){
-      msg+=`\n\nEr zitten ${recCount||0} opname(s) en ${noteCount||0} notitie(s) in.\n\nKlik OK om ALLES mee te verwijderen, of Annuleren om te stoppen.`;
+      msg+=`\n\nEr zitten ${recCount} opname(s) en ${noteCount} notitie(s) in (plus evt. boeken/documenten/inspiratie).\n\nKlik OK om ALLES mee te verwijderen, of Annuleren om te stoppen.`;
       // Twee-staps keuze: eerst vragen of inhoud losgemaakt of meeverwijderd moet
       const keep=confirm(msg+`\n\n\u2192 Wil je de inhoud BEWAREN (losmaken van dit notitieboek)?\nOK = bewaren · Annuleren = juist meeverwijderen`);
       if(keep){
-        // Inhoud losmaken: notebook_id op null
-        await sb.from('recordings').update({ notebook_id:null }).in('notebook_id',ids);
-        await sb.from('notes').update({ notebook_id:null }).in('notebook_id',ids);
+        // Inhoud losmaken: alleen de notebook-koppeling weghalen, de items zelf blijven gewoon bestaan
+        await Promise.all([
+          noteIdsInNb.length?sb.from('note_notebook_links').delete().in('notebook_id',ids):null,
+          recIdsInNb.length?sb.from('recording_notebook_links').delete().in('notebook_id',ids):null,
+          bookIdsInNb.length?sb.from('book_notebook_links').delete().in('notebook_id',ids):null,
+          inspIdsInNb.length?sb.from('inspiration_notebook_links').delete().in('notebook_id',ids):null,
+          docIdsInNb.length?sb.from('document_notebook_links').delete().in('notebook_id',ids):null,
+        ].filter(Boolean));
       } else {
         if(!confirm(`Zeker weten? ${total} item(s) worden definitief verwijderd. Dit kan niet ongedaan gemaakt worden.`)) return;
-        await sb.from('recordings').delete().in('notebook_id',ids);
-        await sb.from('notes').delete().in('notebook_id',ids);
+        await Promise.all([
+          recIdsInNb.length?sb.from('recordings').delete().in('id',recIdsInNb):null,
+          noteIdsInNb.length?sb.from('notes').delete().in('id',noteIdsInNb):null,
+          bookIdsInNb.length?sb.from('book_summaries').delete().in('id',bookIdsInNb):null,
+          inspIdsInNb.length?sb.from('inspiration').delete().in('id',inspIdsInNb):null,
+          docIdsInNb.length?sb.from('documents').delete().in('id',docIdsInNb):null,
+        ].filter(Boolean));
       }
     } else {
       if(!confirm(msg)) return;
@@ -1359,7 +1381,7 @@
   async function load(){
     if(currentTimelineCoachee && !$('coTimelineView').classList.contains('hidden')) return openTimeline(currentTimelineCoachee);
     if(activeTab==='rec') return loadRecordings();
-    return loadNotes();
+    return loadNoteFeed();
   }
 
   // ---- Herbruikbare kaart-HTML (gedeeld door tab, notitieboek-view en favorieten) ----
@@ -1378,6 +1400,24 @@
     const map={};
     (data||[]).forEach(r=>{ (map[r[itemCol]]=map[r[itemCol]]||[]).push(r.bucket_id); });
     return map;
+  }
+  // Generieke versie hiervan (linkCol is instelbaar) \u2014 gebruikt voor notitieboek/coachee-koppelingen op notities
+  async function loadLinksFor(linkTable,itemCol,linkCol,itemIds){
+    if(!itemIds.length) return {};
+    const { data }=await sb.from(linkTable).select(itemCol+','+linkCol).in(itemCol,itemIds);
+    const map={};
+    (data||[]).forEach(r=>{ (map[r[itemCol]]=map[r[itemCol]]||[]).push(r[linkCol]); });
+    return map;
+  }
+  async function itemIdsForLinkValues(linkTable,itemCol,linkCol,linkIds){
+    if(!linkIds.length) return [];
+    const { data }=await sb.from(linkTable).select(itemCol).in(linkCol,linkIds);
+    return [...new Set((data||[]).map(r=>r[itemCol]))];
+  }
+  async function setLinks(linkTable,itemCol,itemId,linkCol,linkIds){
+    const { data:{ user } }=await sb.auth.getUser();
+    await sb.from(linkTable).delete().eq(itemCol,itemId);
+    if(linkIds.length) await sb.from(linkTable).insert(linkIds.map(lid=>({ [itemCol]:itemId, [linkCol]:lid, user_id:user.id })));
   }
   async function itemIdsForBucket(linkTable,itemCol,bucketId){
     const { data }=await sb.from(linkTable).select(itemCol).eq('bucket_id',bucketId);
@@ -1406,6 +1446,111 @@
     const label=names.length?names.map(b=>b.name).join(', '):'Geen buckets';
     return `<button class="act" onclick="${onClick}">${mi(COL.neutral,ICO.link)}${esc(label)}</button>`;
   }
+  // Notitieboek-picker met hi\u00ebrarchie: alleen hoofdboeken zichtbaar, subboeken pas na openvouwen \u2014 meerdere keuzes mogelijk
+  function openNotebookTreePicker(currentIds,onSave){
+    const byParent={};
+    notebooks.forEach(n=>{ const p=n.parent_id||'root'; (byParent[p]=byParent[p]||[]).push(n); });
+    const checked=new Set(currentIds);
+    const openState={};
+    function branch(parent,depth){
+      let out='';
+      (byParent[parent]||[]).forEach(n=>{
+        const kids=byParent[n.id]||[];
+        const hasKids=kids.length>0;
+        const isOpen=!!openState[n.id];
+        out+=`<div>
+          <div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);margin-left:${depth*20}px;">
+            <span class="ntp-caret" data-id="${n.id}" style="cursor:${hasKids?'pointer':'default'};width:18px;flex-shrink:0;color:var(--ink-soft);font-size:16px;line-height:1;">${hasKids?(isOpen?'\u25BE':'\u25B8'):''}</span>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;">
+              <input type="checkbox" class="ntp-chk" data-id="${n.id}" ${checked.has(n.id)?'checked':''} style="width:18px;height:18px;flex-shrink:0;">
+              <span class="nb-dot" style="background:${n.color||'#8a5cff'};width:10px;height:10px;border-radius:50%;flex-shrink:0;"></span>
+              <span>${esc(n.name)}</span>
+            </label>
+          </div>
+          ${hasKids&&isOpen?branch(n.id,depth+1):''}
+        </div>`;
+      });
+      return out;
+    }
+    const rowsHTML=()=>notebooks.length?branch('root',0):'<p style="color:var(--ink-faint);font-size:13.5px;">Nog geen notitieboeken aangemaakt.</p>';
+    const body=`<div id="ntpRows">${rowsHTML()}</div><div class="sheet-actions"><button class="act" id="ntpCancel">Annuleren</button><button class="act primary" id="ntpSave">Opslaan</button></div>`;
+    openSheet('\u{1F4D3} Notitieboek kiezen',body,(ov,close)=>{
+      const rowsEl=ov.querySelector('#ntpRows');
+      rowsEl.addEventListener('click',e=>{
+        const caret=e.target.closest('.ntp-caret');
+        if(caret && caret.dataset.id){ openState[caret.dataset.id]=!openState[caret.dataset.id]; rowsEl.innerHTML=rowsHTML(); }
+      });
+      rowsEl.addEventListener('change',e=>{
+        const chk=e.target.closest('.ntp-chk');
+        if(chk){ if(chk.checked) checked.add(chk.dataset.id); else checked.delete(chk.dataset.id); }
+      });
+      ov.querySelector('#ntpCancel').onclick=close;
+      ov.querySelector('#ntpSave').onclick=()=>{ onSave([...checked]); close(); };
+    });
+  }
+  // Coachee-picker: platte lijst, meerdere keuzes mogelijk (zelfde stijl als buckets)
+  function openCoacheeMultiPicker(currentIds,onSave){
+    const rows=coachees.length
+      ? coachees.map(c=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer;"><input type="checkbox" value="${c.id}" ${currentIds.includes(c.id)?'checked':''} style="width:18px;height:18px;flex-shrink:0;"><span>${esc(c.name)}</span></label>`).join('')
+      : '<p style="color:var(--ink-faint);font-size:13.5px;">Nog geen coachees toegevoegd.</p>';
+    const body=`<div id="copRows">${rows}</div><div class="sheet-actions"><button class="act" id="copCancel">Annuleren</button><button class="act primary" id="copSave">Opslaan</button></div>`;
+    openSheet('\u{1F464} Coachee kiezen',body,(ov,close)=>{
+      ov.querySelector('#copCancel').onclick=close;
+      ov.querySelector('#copSave').onclick=()=>{
+        const checkedIds=[...ov.querySelectorAll('#copRows input[type=checkbox]:checked')].map(i=>i.value);
+        onSave(checkedIds); close();
+      };
+    });
+  }
+  // Het "Koppelen"-popup: drie knoppen (notitieboek/coachee/buckets), elk opent zijn eigen keuzemenu \u2014 meerdere
+  // keuzes per categorie mogelijk, na Opslaan verdwijnt dat keuzemenu weer en zie je de bijgewerkte samenvatting.
+  // Generieke "Koppelen"-popup: knoppenrij per categorie (notitieboek/coachee/buckets), elk opent zijn eigen
+  // keuzemenu met meerdere-keuzes-mogelijk. Herbruikbaar voor elk contenttype door alleen tabelnamen mee te geven.
+  async function openLinksMenu(id,opts){
+    const tasks=[];
+    if(opts.notebook) tasks.push(loadLinksFor(opts.notebook.table,opts.notebook.itemCol,'notebook_id',[id]));
+    if(opts.coachee) tasks.push(loadLinksFor(opts.coachee.table,opts.coachee.itemCol,'coachee_id',[id]));
+    if(opts.bucket) tasks.push(loadBucketLinksFor(opts.bucket.table,opts.bucket.itemCol,[id]));
+    const results=await Promise.all(tasks);
+    let i=0;
+    let nbIds=opts.notebook?(results[i++][id]||[]):[];
+    let coIds=opts.coachee?(results[i++][id]||[]):[];
+    let bkIds=opts.bucket?(results[i++][id]||[]):[];
+    const labelFor=(ids,list)=>ids.length?(ids.map(x=>list.find(o=>o.id===x)?.name).filter(Boolean).join(', ')||'Niet gekoppeld'):'Niet gekoppeld';
+    const row=(btnId,title,label)=>`<button class="act" id="${btnId}" style="width:100%;justify-content:space-between;margin-bottom:8px;text-align:left;">${mi(COL.neutral,ICO.link)}<span style="flex:1;margin-left:8px;">${title}</span><span style="color:var(--ink-faint);font-size:12px;font-weight:400;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(label)}</span></button>`;
+    const bodyHTML=()=>{
+      let h='';
+      if(opts.notebook) h+=row('lmNb','Notitieboek',labelFor(nbIds,notebooks));
+      if(opts.coachee) h+=row('lmCo','Coachee',labelFor(coIds,coachees));
+      if(opts.bucket) h+=row('lmBk','Buckets',labelFor(bkIds,opts.bucket.list));
+      h+=`<div class="sheet-actions"><button class="act primary" id="lmClose">Sluiten</button></div>`;
+      return h;
+    };
+    openSheet('\u{1F517} Koppelen',bodyHTML(),(ov,close)=>{
+      function rewire(){
+        if(opts.notebook) ov.querySelector('#lmNb').onclick=()=>{
+          openNotebookTreePicker(nbIds,async sel=>{ nbIds=sel; await setLinks(opts.notebook.table,opts.notebook.itemCol,id,'notebook_id',sel); if(opts.onSaved) opts.onSaved(); refresh(); });
+        };
+        if(opts.coachee) ov.querySelector('#lmCo').onclick=()=>{
+          openCoacheeMultiPicker(coIds,async sel=>{ coIds=sel; await setLinks(opts.coachee.table,opts.coachee.itemCol,id,'coachee_id',sel); if(opts.onSaved) opts.onSaved(); refresh(); });
+        };
+        if(opts.bucket) ov.querySelector('#lmBk').onclick=()=>{
+          openBucketPicker('\u{1F5C2} Buckets kiezen',opts.bucket.list,bkIds,async checked=>{ bkIds=checked; await setBucketLinks(opts.bucket.table,opts.bucket.itemCol,id,checked); if(opts.onSaved) opts.onSaved(); refresh(); });
+        };
+        ov.querySelector('#lmClose').onclick=close;
+        function refresh(){ ov.querySelector('.sheet-body').innerHTML=bodyHTML(); rewire(); }
+      }
+      rewire();
+    });
+  }
+  function openNoteLinksMenu(id){
+    return openLinksMenu(id,{
+      notebook:{table:'note_notebook_links',itemCol:'note_id'},
+      coachee:{table:'note_coachee_links',itemCol:'note_id'},
+      bucket:{table:'note_bucket_links',itemCol:'note_id',list:noteBuckets},
+      onSaved:()=>loadNoteFeed(),
+    });
+  }
   const ICO={
     play:`<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`,
     trash:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>`,
@@ -1431,7 +1576,10 @@
   };
   const COL={ rec:'linear-gradient(135deg,#ff6b5a,#ff5a8a)', note:'linear-gradient(135deg,#ff5adb,#ff9f43)', map:'linear-gradient(135deg,#7367f0,#5a9cff)', book:'linear-gradient(135deg,#ff9f43,#ff6b5a)', doc:'linear-gradient(135deg,#3b82f6,#6366f1)', danger:'linear-gradient(135deg,#ff6b5a,#e05252)', neutral:'linear-gradient(135deg,#9aa3b2,#6b7280)', dain:'var(--grad-purple)', green:'linear-gradient(135deg,#549E39,#7ac142)', coach:'linear-gradient(135deg,#5a9cff,#7367f0)' };
 
-  function recCardHTML(r){
+  function recCardHTML(r,bucketIds,notebookIds,coacheeIds){
+    bucketIds=bucketIds!==undefined?bucketIds:(r.bucket_id?[r.bucket_id]:[]);
+    notebookIds=notebookIds!==undefined?notebookIds:(r.notebook_id?[r.notebook_id]:[]);
+    coacheeIds=coacheeIds!==undefined?coacheeIds:(r.coachee_id?[r.coachee_id]:[]);
     const hasTranscript=(r.transcripts||[]).length>0;
     const sectionRows=(r.summaries||[]).filter(s=>s.kind==='section').sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));
     const summary=(r.summaries||[]).find(s=>s.kind==='summary')?.content;
@@ -1439,7 +1587,6 @@
     const insights=insightsRow?.content;
     const actions=r.action_items||[];
     const when=new Date(r.recorded_at||r.created_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
-    const nb=nbById(r.notebook_id);
     let body='';
     // Kopjes/samenvatting eerst (de kern), dan inzichten, dan acties — transcriptie komt altijd als laatste en is apart inklapbaar
     if(sectionRows.length){
@@ -1462,18 +1609,17 @@
     }
     if(hasTranscript) btns+=`<button class="act" onclick="openVisualReport('${r.id}')">${mi(COL.green,ICO.palette)}Visueel verslag${vrIds.has(r.id)?'':' maken'}</button>`;
     const menuId=`rmenu-${r.id}`;
-    let menuItems=`<button class="act" onclick="openRecLinks('${r.id}','${r.notebook_id||''}','${r.coachee_id||''}','${r.bucket_id||''}','${r.appointment_id||''}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>`;
+    let menuItems=`<button class="act" onclick="openRecordingLinksMenu('${r.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>`;
+    menuItems+=`<button class="act" onclick="openRecApptPicker('${r.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.calendar)}Koppel aan afspraak</button>`;
     if(hasTranscript) menuItems+=`<button class="act" onclick="event.stopPropagation();openRelated('recording','${r.id}');toggleMenu('${menuId}')">${mi(COL.dain,ICO.link)}Gerelateerd</button>`;
     if(r.status==='summarized') menuItems+=`<button class="act" onclick="event.stopPropagation();shareWithCoachee('${r.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.link)}Deel met coachee</button>`;
     menuItems+=`<button class="act" onclick="shareItem('recording','${r.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>`;
     menuItems+=`<button class="act danger" onclick="askDeleteRecording('${r.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
-    const nb2=nb?`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`:'';
+    const nbTags=notebookIds.map(id=>nbById(id)).filter(Boolean).map(nb=>`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`).join('');
     const tpl=templates.find(t=>t.id===r.template_id);
     const tplTag=tpl?`<span class="tpl-tag">\u25A4 ${esc(tpl.name)}</span>`:'';
-    const co=coachees.find(c=>c.id===r.coachee_id);
-    const coTag=co?`<span class="co-tag">\u{1F464} ${esc(co.name)}</span>`:'';
-    const bk=recBuckets.find(x=>x.id===r.bucket_id);
-    const bkTag=bk?`<span class="nb-tag"><span class="dot" style="background:${bk.color}"></span>${esc(bk.name)}</span>`:'';
+    const coTags=coacheeIds.map(id=>coachees.find(c=>c.id===id)).filter(Boolean).map(co=>`<span class="co-tag">\u{1F464} ${esc(co.name)}</span>`).join('');
+    const bkTags=bucketIds.map(id=>recBuckets.find(x=>x.id===id)).filter(Boolean).map(bk=>`<span class="nb-tag"><span class="dot" style="background:${bk.color}"></span>${esc(bk.name)}</span>`).join('');
     const playBtn=`<button class="play-mini" title="Beluister opname" onclick="event.stopPropagation();playAudio('${r.id}',this)">\u25B6</button>`;
     const previewTxt=preview2((sectionRows[0]?.content)||summary||'');
     const audioRow=`<div class="audio-row" id="audio-${r.id}"></div>`;
@@ -1481,7 +1627,7 @@
       <div class="card-head">
         <div style="display:flex;align-items:flex-start;gap:12px;flex:1;">
           ${playBtn}
-          <div><div class="card-title">${esc(r.title||'Naamloze opname')} <button class="rename-btn" onclick="event.stopPropagation();renameRecording('${r.id}','${escJs(r.title||'')}')" title="Titel wijzigen">\u270E</button>${r.title_is_auto?`<span class="tpl-tag" style="margin-left:4px;" title="Dain past deze titel automatisch aan zodra hij opnieuw analyseert \u2014 totdat je 'm zelf wijzigt">\u2728 auto-titel</span>`:''}</div><div class="card-meta">${when} \u00b7 ${esc(r.source)} ${nb2} ${coTag} ${tplTag} ${bkTag}</div></div>
+          <div><div class="card-title">${esc(r.title||'Naamloze opname')} <button class="rename-btn" onclick="event.stopPropagation();renameRecording('${r.id}','${escJs(r.title||'')}')" title="Titel wijzigen">\u270E</button>${r.title_is_auto?`<span class="tpl-tag" style="margin-left:4px;" title="Dain past deze titel automatisch aan zodra hij opnieuw analyseert \u2014 totdat je 'm zelf wijzigt">\u2728 auto-titel</span>`:''}</div><div class="card-meta">${when} \u00b7 ${esc(r.source)} ${nbTags} ${coTags} ${tplTag} ${bkTags}</div></div>
         </div>
         ${starHTML('recordings',r.id,r.favorite)}
         ${cardMenuHTML(menuId,menuItems)}
@@ -1495,18 +1641,11 @@
     </article>`;
   }
 
-  function noteCardHTML(n,atts,bucketIds){
-    atts=atts||[]; bucketIds=bucketIds||[];
+  function noteCardHTML(n,atts,bucketIds,notebookIds,coacheeIds){
+    atts=atts||[]; bucketIds=bucketIds||[]; notebookIds=notebookIds||[]; coacheeIds=coacheeIds||[];
     const when=new Date(n.created_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
-    const nb=nbById(n.notebook_id);
-    const nbTag=nb?`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`:'';
-    const co=coachees.find(c=>c.id===n.coachee_id);
-    const coTag=co?`<span class="co-tag">\u{1F464} ${esc(co.name)}</span>`:'';
-    const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,id)=>id===n.notebook_id?`value="${id}" selected`:m);
-    const nbPick=`<select onchange="setNoteNotebook('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11.5px;padding:5px 9px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select>`;
-    const coachOpts=`<option value="">\u2014 koppel coachee \u2014</option>`+coachees.map(cc=>`<option value="${cc.id}" ${cc.id===n.coachee_id?'selected':''}>${esc(cc.name)}</option>`).join('');
-    const coachPick=`<select onchange="setNoteCoachee('${n.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11.5px;padding:5px 9px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${coachOpts}</select>`;
-    const bkPick=bucketChipHTML(bucketIds,noteBuckets,`event.stopPropagation();openNoteBucketPicker('${n.id}')`);
+    const nbTags=notebookIds.map(id=>nbById(id)).filter(Boolean).map(nb=>`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`).join('');
+    const coTags=coacheeIds.map(id=>coachees.find(c=>c.id===id)).filter(Boolean).map(co=>`<span class="co-tag">\u{1F464} ${esc(co.name)}</span>`).join('');
     const prev=preview2(n.content||'');
     const thumb=atts.find(a=>a.kind==='image');
     const thumbHTML=thumb?`<img src="${thumb.url}" class="note-thumb" alt="">`:'';
@@ -1515,22 +1654,19 @@
     const menuId=`nmenu-${n.id}`;
     const menuItems=`
       <button class="act" onclick="pickAttachment('note','${n.id}');toggleMenu('${menuId}')">${mi(COL.note,ICO.clip)}Bijlage</button>
-      <button class="act" onclick="toggleInlineSection('nlinks-${n.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>
+      <button class="act" onclick="toggleMenu('${menuId}');openNoteLinksMenu('${n.id}')">${mi(COL.neutral,ICO.link)}Koppelen</button>
       <button class="act" onclick="openRelated('note','${n.id}');toggleMenu('${menuId}')">${mi(COL.dain,ICO.link)}Gerelateerd</button>
       <button class="act" onclick="improveNoteText('${n.id}',this);toggleMenu('${menuId}')">${mi(COL.dain,ICO.sparkle)}Verbeter tekst</button>
       <button class="act" onclick="shareItem('note','${n.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
       <button class="act danger" onclick="askDeleteNote('${n.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
     return `<article class="card collapsible" id="note-${n.id}" data-note-id="${n.id}" onclick="toggleCard(this)">
-      <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(n.title||'Naamloze notitie')} <span id="nundo-${n.id}"></span></div><div class="card-meta">${when} ${nbTag} ${coTag}</div></div>${thumbHTML}${starHTML('notes',n.id,n.favorite)}${cardMenuHTML(menuId,menuItems)}<span class="pill note">notitie</span><span class="card-caret">\u25B6</span></div>
+      <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(n.title||'Naamloze notitie')} <span id="nundo-${n.id}"></span></div><div class="card-meta">${when} ${nbTags} ${coTags}</div></div>${thumbHTML}${starHTML('notes',n.id,n.favorite)}${cardMenuHTML(menuId,menuItems)}<span class="pill note">notitie</span><span class="card-caret">\u25B6</span></div>
       ${prev?`<div class="card-preview">${prev}</div>`:''}
       <div class="card-body" onclick="event.stopPropagation()">
         <input type="text" class="note-inline-title" id="ninlt-${n.id}" value="${esc(n.title||'')}" placeholder="Titel" oninput="scheduleNoteSave('${n.id}')">
         <div class="note-inline-content" id="ninlc-${n.id}" contenteditable="true" data-placeholder="Schrijf hier je gedachte\u2026 (plak gerust een afbeelding)" oninput="scheduleNoteSave('${n.id}')" onpaste="handleNotePaste(event,'${n.id}')">${renderNoteContentHTML(n.content,atts)}</div>
         <span class="save-status" id="nstat-${n.id}"></span>
         <div id="noteatt-${n.id}">${attachmentsBlockHTML(looseAtts)}</div>
-        <div id="nlinks-${n.id}" class="hidden">
-          <div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;">${nbPick} ${coachPick} ${bkPick}</div>
-        </div>
       </div></article>`;
   }
   function toggleInlineSection(id){
@@ -1549,18 +1685,29 @@
       <div class="card-actions" onclick="event.stopPropagation()"><button class="act primary" onclick="openMap('${m.id}','${escJs(m.title)}')">${mi(COL.map,ICO.link)}Openen</button></div></article>`;
   }
 
-  function bookCardHTML(b,bucketIds){
+  function bookCardHTML(b,bucketIds,notebookIds,coacheeIds){
+    notebookIds=notebookIds||[]; coacheeIds=coacheeIds||[];
+    const nbTags=notebookIds.map(id=>nbById(id)).filter(Boolean).map(nb=>`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`).join('');
+    const coTags=coacheeIds.map(id=>coachees.find(c=>c.id===id)).filter(Boolean).map(co=>`<span class="co-tag">\u{1F464} ${esc(co.name)}</span>`).join('');
     const menuId=`bmenu-${b.id}`;
     const menuItems=`
       <button class="act" onclick="event.stopPropagation();editBook('${b.id}','${escJs(b.title||'')}','${escJs(b.author||'')}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.pencil)}Titel/auteur wijzigen</button>
-      <button class="act" onclick="toggleInlineSection('blinks-${b.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>
+      <button class="act" onclick="openBookLinksMenu('${b.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>
       <button class="act" onclick="shareItem('book','${b.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
       <button class="act danger" onclick="delBook('${b.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
     return `<article class="card collapsible" id="book-${b.id}" onclick="toggleCard(this)">
-      <div class="card-head"><div style="display:flex;align-items:center;gap:14px;flex:1;"><span class="bk-cover"></span><div><div class="card-title">${esc(b.title)}</div><div class="card-meta">${b.author?esc(b.author):'Onbekende auteur'}</div></div></div>${starHTML('book_summaries',b.id,b.favorite)}${cardMenuHTML(menuId,menuItems)}<span class="pill ${b.status==='summarized'?'summarized':'uploaded'}">${b.status==='summarized'?'samengevat':'concept'}</span><span class="card-caret">\u25B6</span></div>
+      <div class="card-head"><div style="display:flex;align-items:center;gap:14px;flex:1;"><span class="bk-cover"></span><div><div class="card-title">${esc(b.title)}</div><div class="card-meta">${b.author?esc(b.author):'Onbekende auteur'} ${nbTags} ${coTags}</div></div></div>${starHTML('book_summaries',b.id,b.favorite)}${cardMenuHTML(menuId,menuItems)}<span class="pill ${b.status==='summarized'?'summarized':'uploaded'}">${b.status==='summarized'?'samengevat':'concept'}</span><span class="card-caret">\u25B6</span></div>
       ${b.ai_summary?`<div class="card-preview">${preview2(b.ai_summary)}</div>`:''}
       <div class="card-body" onclick="event.stopPropagation()">${bookBodyHTML(b,bucketIds)}</div>
       <div class="card-actions" onclick="event.stopPropagation()">${b.status!=='summarized'?`<button class="act primary" onclick="summarizeBook('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Laat Dain analyseren</button>`:`<button class="act" onclick="summarizeBook('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Opnieuw analyseren</button>`}</div></article>`;
+  }
+  function openBookLinksMenu(id){
+    return openLinksMenu(id,{
+      notebook:{table:'book_notebook_links',itemCol:'book_id'},
+      coachee:{table:'book_coachee_links',itemCol:'book_id'},
+      bucket:{table:'book_bucket_links',itemCol:'book_id',list:bookBuckets},
+      onSaved:()=>loadBooks(),
+    });
   }
 
   let vrIds=new Set();
@@ -1572,7 +1719,10 @@
     renderRecBucketBar();
     await refreshVrIds();
     let q=sb.from('recordings').select('id, title, title_is_auto, status, source, notebook_id, coachee_id, template_id, bucket_id, favorite, appointment_id, recorded_at, created_at, transcripts(id), summaries(kind, title, content, sort_order), action_items(content, done)',{count:'exact'}).neq('status','deleted').order('created_at',{ascending:false}).limit(recLimit);
-    if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
+    if(activeNB!=='all'){
+      const nbIds=await itemIdsForLinkValues('recording_notebook_links','recording_id','notebook_id',nbWithDescendants(activeNB));
+      q=q.in('id',nbIds.length?nbIds:['00000000-0000-0000-0000-000000000000']);
+    }
     if(activeRecBucket!=='all'){
       const ids=await itemIdsForBucket('recording_bucket_links','recording_id',activeRecBucket);
       q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
@@ -1581,7 +1731,11 @@
     if(error){ conn.textContent='fout'; feed.innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
     conn.textContent=`\u25CF ${count??recs.length} opname${(count??recs.length)===1?'':'s'}`;
     if(!recs.length){ feed.innerHTML=`<div class="empty"><div class="big">Nog geen opnames</div><p>${activeRecBucket==='all'?'Upload hierboven een audiobestand om te beginnen.':'Deze bucket is nog leeg.'}</p></div>`; return; }
-    setCardsHTMLPreserveOpen(feed,recs.map(recCardHTML).join('')+loadMoreHTML('recLimit+=50;loadRecordings()',recs.length,count));
+    const recIds=recs.map(r=>r.id);
+    const bkByRec=await loadBucketLinksFor('recording_bucket_links','recording_id',recIds);
+    const nbByRec=await loadLinksFor('recording_notebook_links','recording_id','notebook_id',recIds);
+    const coByRec=await loadLinksFor('recording_coachee_links','recording_id','coachee_id',recIds);
+    setCardsHTMLPreserveOpen(feed,recs.map(r=>recCardHTML(r,bkByRec[r.id],nbByRec[r.id],coByRec[r.id])).join('')+loadMoreHTML('recLimit+=50;loadRecordings()',recs.length,count));
   }
 
   // "Laad meer"-knop voor gepagineerde feeds
@@ -1591,19 +1745,7 @@
   }
 
   let noteLimit=50;
-  async function loadNotes(){
-    if(typeof resetComposer==="function") resetComposer();
-    let q=sb.from('notes').select('*',{count:'exact'}).is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false}).limit(noteLimit);
-    if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
-    const { data:notes, error, count }=await q;
-    if(error){ conn.textContent='fout'; feed.innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
-    conn.textContent=`\u25CF ${count??notes.length} notitie${(count??notes.length)===1?'':'s'}`;
-    if(!notes.length){ feed.innerHTML=''; if($('feedNote')) $('feedNote').innerHTML=`<div class="empty"><div class="big">Nog geen notities</div><p>Schrijf hierboven je eerste losse notitie.</p></div>`; return; }
-    feed.innerHTML='';
-    if($('feedNote')) setCardsHTMLPreserveOpen($('feedNote'),notes.map(noteCardHTML).join('')+loadMoreHTML('noteLimit+=50;loadNoteFeed()',notes.length,count));
-  }
 
-  async function setNoteCoachee(id,cid){ await sb.from('notes').update({ coachee_id:cid||null }).eq('id',id); loadNoteFeed(); }
 
   // ---- Favorieten ----
   async function toggleFav(table,id,btn){
@@ -1669,10 +1811,6 @@
 
   // Note delete moved to modal system (askDeleteNote below)
 
-  async function setNoteNotebook(id,nbId){
-    await sb.from('notes').update({ notebook_id:nbId||null }).eq('id',id);
-    loadNoteFeed();
-  }
 
   const editTimers={};
   // Direct bewerkbaar: titel + inhoud slaan zichzelf gedebouncet op, geen 'Bewerken'-klik meer nodig
@@ -1735,15 +1873,18 @@
     if(!content && !title && !force){ return; } // niks om op te slaan
     setStatus('saving');
     const { data:{ user } }=await sb.auth.getUser();
+    const nbVal=$('noteNotebook').value||null;
     if(!composerNoteId){
       // eerste keer: nieuwe notitie aanmaken
-      const { data, error }=await sb.from('notes').insert({ user_id:user.id, title:title||null, content, notebook_id:$('noteNotebook').value||null, is_live_note:false }).select().single();
+      const { data, error }=await sb.from('notes').insert({ user_id:user.id, title:title||null, content, notebook_id:nbVal, is_live_note:false }).select().single();
       if(error){ setStatus(''); return; }
       composerNoteId=data.id;
+      await setLinks('note_notebook_links','note_id',composerNoteId,'notebook_id',nbVal?[nbVal]:[]);
       loadNotesIndex();
     } else {
-      const { error }=await sb.from('notes').update({ title:title||null, content, notebook_id:$('noteNotebook').value||null }).eq('id',composerNoteId);
+      const { error }=await sb.from('notes').update({ title:title||null, content, notebook_id:nbVal }).eq('id',composerNoteId);
       if(error){ setStatus(''); return; }
+      await setLinks('note_notebook_links','note_id',composerNoteId,'notebook_id',nbVal?[nbVal]:[]);
     }
     setStatus('saved');
     embedContent('notes',composerNoteId);
@@ -2243,8 +2384,13 @@
       const path=`${Date.now()}_${safe}`;
       const { error:upErr }=await sb.storage.from('Recordings').upload(path,file);
       if(upErr){ failed++; upProgress.textContent=`Mislukt bij ${file.name}: ${upErr.message}`; continue; }
-      const { error:insErr }=await sb.from('recordings').insert({ user_id:user.id, title:singleTitle||file.name, source:'upload', audio_path:path, language:'nl', status:'uploaded', notebook_id:nb, coachee_id:co, bucket_id:bk });
+      const { data:insData, error:insErr }=await sb.from('recordings').insert({ user_id:user.id, title:singleTitle||file.name, source:'upload', audio_path:path, language:'nl', status:'uploaded', notebook_id:nb, coachee_id:co, bucket_id:bk }).select().single();
       if(insErr){ failed++; upProgress.textContent=`Opslaan mislukt bij ${file.name}: ${insErr.message}`; continue; }
+      if(insData){
+        if(nb) await setLinks('recording_notebook_links','recording_id',insData.id,'notebook_id',[nb]);
+        if(co) await setLinks('recording_coachee_links','recording_id',insData.id,'coachee_id',[co]);
+        if(bk) await setBucketLinks('recording_bucket_links','recording_id',insData.id,[bk]);
+      }
       done++;
     }
     upProgress.textContent = failed
@@ -3120,16 +3266,6 @@
     await loadCoachees();
   }
 
-  async function setCoachee(recId,coacheeId){
-    await sb.from('recordings').update({ coachee_id:coacheeId||null }).eq('id',recId);
-    const r=null; // feed herlaadt niet volledig; werk lokaal bij
-    await loadRecordings();
-  }
-
-  async function setRecNotebook(recId,nbId){
-    await sb.from('recordings').update({ notebook_id:nbId||null }).eq('id',recId);
-    await loadRecordings();
-  }
 
   // Spring naar de chat en stel meteen een vraag over deze coachee
   function askAboutCoachee(id,name){
@@ -3404,19 +3540,9 @@
         <textarea id="bkins-${b.id}" placeholder="Wat deed dit boek met jou? Welke inzichten neem je mee?\u2026" oninput="scheduleBookInsight('${b.id}',this)">${esc(b.my_insights||'')}</textarea>
         <span class="save-status" id="bkstat-${b.id}"></span>
       </div>`;
-    const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,id)=>id===b.notebook_id?`value="${id}" selected`:m);
-    const nbPick=`<select onchange="setBookNotebook('${b.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select>`;
-    const bkPick=bucketChipHTML(bucketIds,bookBuckets,`openBookBucketPicker('${b.id}')`);
-    body+=`<div id="blinks-${b.id}" class="hidden"><div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${nbPick} ${bkPick}</div></div>`;
     return body;
   }
-  async function openBookBucketPicker(id){
-    const current=(await loadBucketLinksFor('book_bucket_links','book_id',[id]))[id]||[];
-    openBucketPicker('\u{1F5C2} Buckets kiezen',bookBuckets,current,async(checked)=>{
-      await setBucketLinks('book_bucket_links','book_id',id,checked);
-      loadBooks();
-    });
-  }
+
 
   let bookLimit=50;
   async function loadBooks(){
@@ -3431,7 +3557,9 @@
     conn.textContent=`\u25CF ${count??books.length} boek${(count??books.length)===1?'':'en'}`;
     if(!books.length){ $('bkCards').innerHTML=`<div class="empty"><div class="big">Nog geen boeken</div><p>Voeg hierboven je eerste boek toe.</p></div>`; return; }
     const bkByBook=await loadBucketLinksFor('book_bucket_links','book_id',books.map(b=>b.id));
-    setCardsHTMLPreserveOpen($('bkCards'),books.map(b=>bookCardHTML(b,bkByBook[b.id])).join('')+loadMoreHTML('bookLimit+=50;loadBooks()',books.length,count));
+    const nbByBook=await loadLinksFor('book_notebook_links','book_id','notebook_id',books.map(b=>b.id));
+    const coByBook=await loadLinksFor('book_coachee_links','book_id','coachee_id',books.map(b=>b.id));
+    setCardsHTMLPreserveOpen($('bkCards'),books.map(b=>bookCardHTML(b,bkByBook[b.id],nbByBook[b.id],coByBook[b.id])).join('')+loadMoreHTML('bookLimit+=50;loadBooks()',books.length,count));
   }
 
   $('bkCreateBtn').addEventListener('click',async()=>{
@@ -3443,6 +3571,7 @@
       source_notes:$('bkNotes').value.trim()||null, notebook_id:activeNB!=='all'?activeNB:null
     }).select().single();
     if(error){ toast('Kon boek niet toevoegen: '+error.message); return; }
+    if(activeNB!=='all') await setLinks('book_notebook_links','book_id',data.id,'notebook_id',[activeNB]);
     embedContent('book_summaries',data.id);
     ['bkTitle','bkAuthor','bkNotes'].forEach(id=>$(id).value='');
     await loadBooks();
@@ -3507,26 +3636,25 @@
     if(status==='failed') return '<span class="pill failed">mislukt</span>';
     return '<span class="pill uploaded">nog niet gelezen</span>';
   }
-  function docCardHTML(d){
+  function docCardHTML(d,notebookIds){
+    notebookIds=notebookIds||(d.notebook_id?[d.notebook_id]:[]);
     const meta=docFileMeta(d.file_type);
     const when=new Date(d.created_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
-    const nb=nbById(d.notebook_id);
+    const nbTags=notebookIds.map(id=>nbById(id)).filter(Boolean).map(nb=>`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`).join('');
     let body='';
     if(d.ai_summary) body+=`<div class="section-label"><span>Samenvatting van Dain</span></div><div class="text-block">${linkifyWiki(d.ai_summary)}</div>`;
     if(d.key_points) body+=`<div class="section-label"><span>Kernpunten</span></div><div class="text-block">${linkifyWiki(d.key_points)}</div>`;
     body+=`<div class="section-label"><span>Mijn notities</span> <button class="act" style="padding:3px 10px;font-size:11.5px;margin-left:6px;text-transform:none;letter-spacing:normal;" onclick="event.stopPropagation();improveDocNotes('${d.id}',this)">${mi(COL.dain,ICO.sparkle)}Verbeter tekst</button> <span id="dundo-${d.id}"></span></div>
       <div class="bk-insights"><textarea id="docnote-${d.id}" placeholder="Jouw eigen aantekeningen bij dit document\u2026" oninput="scheduleDocNote('${d.id}',this)">${esc(d.my_notes||'')}</textarea><span class="save-status" id="docstat-${d.id}"></span></div>`;
-    const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions(d.notebook_id);
-    body+=`<div id="dlinks-${d.id}" class="hidden"><div class="section-label"><span>Notitieboek</span></div><div><select onchange="setDocNotebook('${d.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select></div></div>`;
     const menuId=`dmenu-${d.id}`;
     const menuItems=`
-      <button class="act" onclick="toggleInlineSection('dlinks-${d.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>
+      <button class="act" onclick="openDocLinksMenu('${d.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>
       <button class="act" onclick="shareItem('document','${d.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
       <button class="act danger" onclick="deleteDocument('${d.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
     return `<article class="card collapsible" id="doc-${d.id}" onclick="toggleCard(this)">
       <div class="card-head">
         <span class="mi" style="background:${meta.grad};width:34px;height:34px;border-radius:9px;flex-shrink:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;">${meta.shape}</svg></span>
-        <div style="flex:1;min-width:0;"><div class="card-title">${esc(d.title||d.file_name)}</div><div class="card-meta">${when} \u00b7 ${meta.label}${nb?' \u00b7 '+esc(nb.name):''}</div></div>
+        <div style="flex:1;min-width:0;"><div class="card-title">${esc(d.title||d.file_name)}</div><div class="card-meta">${when} \u00b7 ${meta.label} ${nbTags}</div></div>
         ${starHTML('documents',d.id,d.favorite)}
         ${cardMenuHTML(menuId,menuItems)}
         ${docStatusPill(d.status)}
@@ -3538,13 +3666,20 @@
       </div>
     </article>`;
   }
+  function openDocLinksMenu(id){
+    return openLinksMenu(id,{
+      notebook:{table:'document_notebook_links',itemCol:'document_id'},
+      onSaved:()=>loadDocuments(),
+    });
+  }
   let docLimit=50;
   async function loadDocuments(){
     const { data:docs, error, count }=await sb.from('documents').select('*',{count:'exact'}).neq('status','deleted').order('created_at',{ascending:false}).limit(docLimit);
     if(error){ $('docCards').innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
     conn.textContent=`\u25CF ${count??docs.length} document${(count??docs.length)===1?'':'en'}`;
     if(!docs.length){ $('docCards').innerHTML=`<div class="empty"><div class="big">Nog geen documenten</div><p>Upload hierboven je eerste PDF, Word- of PowerPoint-bestand.</p></div>`; return; }
-    setCardsHTMLPreserveOpen($('docCards'),docs.map(docCardHTML).join('')+loadMoreHTML('docLimit+=50;loadDocuments()',docs.length,count));
+    const nbByDoc=await loadLinksFor('document_notebook_links','document_id','notebook_id',docs.map(d=>d.id));
+    setCardsHTMLPreserveOpen($('docCards'),docs.map(d=>docCardHTML(d,nbByDoc[d.id])).join('')+loadMoreHTML('docLimit+=50;loadDocuments()',docs.length,count));
   }
   function openDocUploadPopup(){
     const nbOpts=`<option value="">Geen notitieboek</option>`+notebookOptions(activeNB!=='all'?activeNB:null);
@@ -3599,6 +3734,7 @@
       file_type:fileType, file_size:file.size, notebook_id:notebookId, status:'uploaded',
     }).select().single();
     if(error) throw new Error(error.message);
+    if(notebookId) await setLinks('document_notebook_links','document_id',data.id,'notebook_id',[notebookId]);
     embedContent('documents',data.id);
     return data;
   }
@@ -3624,7 +3760,8 @@
       if(!error) embedContent('documents',id);
     },900);
   }
-  async function setDocNotebook(id,nbId){ await sb.from('documents').update({ notebook_id:nbId||null }).eq('id',id); await loadDocuments(); }
+
+
   async function openDocFile(id){
     const { data:doc, error }=await sb.from('documents').select('file_path,file_name').eq('id',id).single();
     if(error||!doc){ toast('Kon document niet vinden.'); return; }
@@ -3643,10 +3780,6 @@
     await loadDocuments();
   }
 
-  async function setBookNotebook(id,nbId){
-    await sb.from('book_summaries').update({ notebook_id:nbId||null }).eq('id',id);
-    await loadBooks();
-  }
 
   // Auto-save van eigen inzichten
   const bookInsTimers={};
@@ -4164,33 +4297,24 @@
   async function setBookBucket(id,bucketId){
     await sb.from('book_summaries').update({ bucket_id:bucketId||null }).eq('id',id);
   }
-  async function openRecLinks(id,nbId,coId,bkId,apptId){
-    const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,vid)=>vid===nbId?`value="${vid}" selected`:m);
-    const coachOpts=`<option value="">\u2014 koppel coachee \u2014</option>`+coachees.map(c=>`<option value="${c.id}" ${c.id===coId?'selected':''}>${esc(c.name)}</option>`).join('');
-    if(!recBuckets.length) await loadRecBuckets();
-    const currentBk=(await loadBucketLinksFor('recording_bucket_links','recording_id',[id]))[id]||[];
-    const body=`
-      <label>Notitieboek</label><select id="rlNb">${nbOpts}</select>
-      <label>Coachee</label><select id="rlCo">${coachOpts}</select>
-      <label>Buckets</label><div>${bucketChipHTML(currentBk,recBuckets,`openRecBucketPicker('${id}')`)}</div>
-      <label>Afspraak <span style="color:var(--ink-faint);font-weight:400;">(los opgenomen? koppel 'm hier alsnog aan een gesprek)</span></label><select id="rlAppt">${await apptOptionsFor(coId,apptId)}</select>
-      <div class="sheet-actions"><button class="act primary" id="rlDone" style="margin-left:auto;">Klaar</button></div>`;
-    openSheet('\u{1F517} Koppelen', body, (ov,close)=>{
-      $('rlNb').onchange=()=>setRecNotebook(id,$('rlNb').value);
-      $('rlCo').onchange=async()=>{
-        const newCo=$('rlCo').value;
-        setCoachee(id,newCo);
-        $('rlAppt').innerHTML=await apptOptionsFor(newCo,null); // andere coachee = andere agenda, koppeling vervalt
-      };
-      $('rlAppt').onchange=()=>setRecAppointment(id,$('rlAppt').value);
-      $('rlDone').onclick=()=>{ close(); load(); };
+  function openRecordingLinksMenu(id){
+    return openLinksMenu(id,{
+      notebook:{table:'recording_notebook_links',itemCol:'recording_id'},
+      coachee:{table:'recording_coachee_links',itemCol:'recording_id'},
+      bucket:{table:'recording_bucket_links',itemCol:'recording_id',list:recBuckets},
+      onSaved:()=>load(),
     });
   }
-  async function openRecBucketPicker(id){
-    const current=(await loadBucketLinksFor('recording_bucket_links','recording_id',[id]))[id]||[];
-    openBucketPicker('\u{1F5C2} Buckets kiezen',recBuckets,current,async(checked)=>{
-      await setBucketLinks('recording_bucket_links','recording_id',id,checked);
-      load();
+  async function openRecApptPicker(id){
+    const coIds=(await loadLinksFor('recording_coachee_links','recording_id','coachee_id',[id]))[id]||[];
+    const { data:rec }=await sb.from('recordings').select('appointment_id').eq('id',id).maybeSingle();
+    const body=`
+      <label>Afspraak <span style="color:var(--ink-faint);font-weight:400;">(los opgenomen? koppel 'm hier alsnog aan een gesprek)</span></label>
+      <select id="rlAppt">${await apptOptionsFor(coIds[0]||null,rec?.appointment_id)}</select>
+      <div class="sheet-actions"><button class="act primary" id="rlDone" style="margin-left:auto;">Opslaan</button></div>`;
+    openSheet('\u{1F4C5} Koppel aan afspraak', body, (ov,close)=>{
+      if(!coIds.length) ov.querySelector('label+label')?.remove();
+      ov.querySelector('#rlDone').onclick=async()=>{ await setRecAppointment(id,ov.querySelector('#rlAppt').value); close(); load(); };
     });
   }
   // ================= VISUEEL VERSLAG (Dain tekent een opgemaakt HTML-verslag) =================
@@ -4559,11 +4683,34 @@
   function fmtTime(sec){ const m=Math.floor(sec/60), s=sec%60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
 
   let liveApptId=null;
+  let liveNbIds=[], liveCoIds=[], liveBkIds=[];
+  // Zelfde rij-stijl als het "Koppelen"-popup (openLinksMenu), maar dan v\u00f3\u00f3r het opslaan \u2014
+  // de opname bestaat nog niet, dus houden we de keuzes lokaal bij tot op het moment van Opslaan.
+  function liveLinksRowHTML(){
+    const labelFor=(ids,list)=>ids.length?(ids.map(x=>list.find(o=>o.id===x)?.name).filter(Boolean).join(', ')||'Niet gekozen'):'Niet gekozen';
+    const row=(id,title,label)=>`<button class="act" id="${id}" style="width:100%;justify-content:space-between;margin-bottom:8px;text-align:left;">${mi(COL.neutral,ICO.link)}<span style="flex:1;margin-left:8px;">${title}</span><span style="color:var(--ink-faint);font-size:12px;font-weight:400;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(label)}</span></button>`;
+    return row('liveNbBtn','Notitieboek',labelFor(liveNbIds,notebooks))+row('liveCoBtn','Coachee',labelFor(liveCoIds,coachees))+row('liveBkBtn','Bucket',labelFor(liveBkIds,recBuckets));
+  }
+  function refreshLiveLinks(ov){
+    ov.querySelector('#liveLinksRow').innerHTML=liveLinksRowHTML();
+    rewireLiveLinks(ov);
+  }
+  function rewireLiveLinks(ov){
+    ov.querySelector('#liveNbBtn').onclick=()=>{
+      openNotebookTreePicker(liveNbIds,sel=>{ liveNbIds=sel; refreshLiveLinks(ov); });
+    };
+    ov.querySelector('#liveCoBtn').onclick=()=>{
+      openCoacheeMultiPicker(liveCoIds,sel=>{ liveCoIds=sel; refreshLiveLinks(ov); });
+    };
+    ov.querySelector('#liveBkBtn').onclick=()=>{
+      openBucketPicker('\u{1F5C2} Buckets kiezen',recBuckets,liveBkIds,sel=>{ liveBkIds=sel; refreshLiveLinks(ov); });
+    };
+  }
   function openLiveRec(preselectCoacheeId,appointmentId){
     liveApptId=appointmentId||null;
-    const nbOpts=`<option value="">Geen notitieboek</option>`+notebookOptions(activeNB!=='all'?activeNB:null);
-    const coOpts=`<option value="">Geen coachee</option>`+coachees.map(c=>`<option value="${c.id}" ${c.id===preselectCoacheeId?'selected':''}>${esc(c.name)}</option>`).join('');
-    const bkOpts=recBucketOptions(activeRecBucket!=='all'?activeRecBucket:'');
+    liveNbIds=(activeNB && activeNB!=='all')?[activeNB]:[];
+    liveCoIds=preselectCoacheeId?[preselectCoacheeId]:[];
+    liveBkIds=(activeRecBucket && activeRecBucket!=='all')?[activeRecBucket]:[];
     const preCo=coachees.find(c=>c.id===preselectCoacheeId);
     const defaultTitle=preCo?`Sessie met ${preCo.name}`:'';
     const body=`
@@ -4573,13 +4720,8 @@
         <div id="liveState" style="font-size:13px;color:var(--ink-faint);margin-bottom:12px;">Klik om te starten</div>
         <label style="text-align:left;">Titel</label>
         <input type="text" id="liveTitle" placeholder="Bijv. Sessie met \u2026" value="${esc(defaultTitle)}">
-        <div style="display:flex;gap:10px;margin-top:10px;">
-          <select id="liveNb" style="flex:1;">${nbOpts}</select>
-          <select id="liveCo" style="flex:1;">${coOpts}</select>
-        </div>
-        <label style="text-align:left;margin-top:10px;">Bucket</label>
-        <select id="liveBucket">${bkOpts}</select>
-        <label style="text-align:left;margin-top:14px;">Aantekeningen tijdens de opname</label>
+        <div id="liveLinksRow" style="margin-top:12px;">${liveLinksRowHTML()}</div>
+        <label style="text-align:left;margin-top:6px;">Aantekeningen tijdens de opname</label>
         <textarea id="liveNotes" placeholder="Typ hier mee terwijl je opneemt\u2026 deze aantekeningen worden als losse notitie bewaard."></textarea>
         <div class="sheet-actions">
           <button class="act" id="liveCancel">Annuleren</button>
@@ -4587,6 +4729,7 @@
         </div>
       </div>`;
     openSheet('\u{1F534} Direct opnemen', body, (ov,close)=>{
+      rewireLiveLinks(ov);
       $('liveCancel').onclick=()=>{ stopLiveTracks(); close(); };
       $('liveSave').onclick=()=>saveLiveRec(close);
       ov._closed=()=>stopLiveTracks();
@@ -4633,9 +4776,14 @@
     const { error:upErr }=await sb.storage.from('Recordings').upload(path,blob);
     if(upErr){ toast('Upload mislukt: '+upErr.message); btn.disabled=false; btn.textContent='Opslaan & transcriberen'; return; }
     const title=$('liveTitle').value.trim()||('Live-opname '+new Date().toLocaleString('nl-NL'));
-    const nb=$('liveNb').value||null, co=$('liveCo').value||null, bk=$('liveBucket').value||null;
-    const { data:rec, error:insErr }=await sb.from('recordings').insert({ user_id:user.id, title, source:'live', audio_path:path, language:'nl', status:'uploaded', notebook_id:nb, coachee_id:co, bucket_id:bk, appointment_id:liveApptId }).select().single();
+    const nb=liveNbIds[0]||null, co=liveCoIds[0]||null, bk=liveBkIds[0]||null;
+    const { data:rec, error:insErr }=await sb.from('recordings').insert({ user_id:user.id, title, source:'browser', audio_path:path, language:'nl', status:'uploaded', notebook_id:nb, coachee_id:co, bucket_id:bk, appointment_id:liveApptId }).select().single();
     if(insErr){ toast('Opslaan mislukt: '+insErr.message); btn.disabled=false; return; }
+    if(rec){
+      if(liveNbIds.length) await setLinks('recording_notebook_links','recording_id',rec.id,'notebook_id',liveNbIds);
+      if(liveCoIds.length) await setLinks('recording_coachee_links','recording_id',rec.id,'coachee_id',liveCoIds);
+      if(liveBkIds.length) await setBucketLinks('recording_bucket_links','recording_id',rec.id,liveBkIds);
+    }
     const notes=$('liveNotes').value.trim();
     if(notes){ await sb.from('notes').insert({ user_id:user.id, title:'Aantekeningen: '+title, content:notes, notebook_id:nb, coachee_id:co, recording_id:rec.id }); }
     stopLiveTracks(); close();
@@ -4786,7 +4934,10 @@
     if(!inspBuckets.length) await loadBuckets(); else renderBucketBar();
     grid.innerHTML='<div class="empty"><div class="big">Laden\u2026</div></div>';
     let q=sb.from('inspiration').select('*',{count:'exact'}).order('created_at',{ascending:false}).limit(inspLimit);
-    if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
+    if(activeNB!=='all'){
+      const nbIds=await itemIdsForLinkValues('inspiration_notebook_links','inspiration_id','notebook_id',nbWithDescendants(activeNB));
+      q=q.in('id',nbIds.length?nbIds:['00000000-0000-0000-0000-000000000000']);
+    }
     if(activeBucket!=='all'){
       const ids=await itemIdsForBucket('inspiration_bucket_links','inspiration_id',activeBucket);
       q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
@@ -4798,6 +4949,8 @@
     if(!items.length){ grid.innerHTML=`<div class="empty"><div class="big">Nog leeg</div><p>${activeBucket==='all'?'Plak een link, sleep een screenshot of upload een foto om te beginnen.':'Deze bucket is nog leeg. Koppel er vonken aan via het potloodje op een kaart.'}</p></div>`; return; }
     const attByInsp=await loadAttachmentsFor('inspiration',items.map(i=>i.id));
     const bkByInsp=await loadBucketLinksFor('inspiration_bucket_links','inspiration_id',items.map(i=>i.id));
+    const nbByInsp=await loadLinksFor('inspiration_notebook_links','inspiration_id','notebook_id',items.map(i=>i.id));
+    const coByInsp=await loadLinksFor('inspiration_coachee_links','inspiration_id','coachee_id',items.map(i=>i.id));
     const cards=await Promise.all(items.map(async i=>{
       let media='';
       if(i.kind==='image' && i.image_path){
@@ -4815,12 +4968,20 @@
         const bk=inspBuckets.find(x=>x.id===bid);
         if(bk) bodyInner+=`<span class="ic-bucket" style="background:${bk.color}">${esc(bk.name)}</span>`;
       });
+      (nbByInsp[i.id]||[]).forEach(nid=>{
+        const nb=nbById(nid);
+        if(nb) bodyInner+=`<span class="ic-bucket" style="background:${nb.color}">${esc(nb.name)}</span>`;
+      });
+      (coByInsp[i.id]||[]).forEach(cid=>{
+        const co=coachees.find(c=>c.id===cid);
+        if(co) bodyInner+=`<span class="ic-bucket" style="background:#8a5cff">\u{1F464} ${esc(co.name)}</span>`;
+      });
       bodyInner+=attachmentsBlockHTML(attByInsp[i.id]);
       const bodyBlock=bodyInner?`<div class="ic-body">${bodyInner}</div>`:'';
       const menuId=`imenu-${i.id}`;
       const menuItems=`
         <button class="act" onclick="pickAttachment('inspiration','${i.id}');toggleMenu('${menuId}')">${mi(COL.note,ICO.clip)}Bijlage</button>
-        <button class="act" onclick="openInspBucketPicker('${i.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Buckets</button>
+        <button class="act" onclick="openInspLinksMenu('${i.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>
         <button class="act" onclick="editInsp('${i.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.pencil)}Bewerken</button>
         <button class="act" onclick="shareItem('inspiration','${i.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
         <button class="act danger" onclick="delInsp('${i.id}','${i.image_path||''}')">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
@@ -4835,11 +4996,12 @@
     grid.innerHTML=cards.join('')+(inspCount>items.length?`<div style="grid-column:1/-1;text-align:center;margin:10px 0;"><button class="act" onclick="inspLimit+=50;loadInspiration()">\u2B07 Laad meer (${items.length} van ${inspCount})</button></div>`:'');
     initPendingPdfViewers();
   }
-  async function openInspBucketPicker(id){
-    const current=(await loadBucketLinksFor('inspiration_bucket_links','inspiration_id',[id]))[id]||[];
-    openBucketPicker('\u{1F5C2} Buckets kiezen',inspBuckets,current,async(checked)=>{
-      await setBucketLinks('inspiration_bucket_links','inspiration_id',id,checked);
-      loadInspiration();
+  function openInspLinksMenu(id){
+    return openLinksMenu(id,{
+      notebook:{table:'inspiration_notebook_links',itemCol:'inspiration_id'},
+      coachee:{table:'inspiration_coachee_links',itemCol:'inspiration_id'},
+      bucket:{table:'inspiration_bucket_links',itemCol:'inspiration_id',list:inspBuckets},
+      onSaved:()=>loadInspiration(),
     });
   }
 
@@ -4856,7 +5018,8 @@
         const url=$('ilUrl').value.trim(); if(!url){ toast('Plak een link.'); return; }
         const kind=(ytEmbed(url)||vimeoEmbed(url))?'video':'link';
         const { data:{ user } }=await sb.auth.getUser();
-        await sb.from('inspiration').insert({ user_id:user.id, kind, url, title:$('ilTitle').value.trim()||null, content:$('ilNote').value.trim()||null, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:$('ilBucket').value||null });
+        const { data:row }=await sb.from('inspiration').insert({ user_id:user.id, kind, url, title:$('ilTitle').value.trim()||null, content:$('ilNote').value.trim()||null, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:$('ilBucket').value||null }).select().single();
+        if(row && activeNB!=='all') await setLinks('inspiration_notebook_links','inspiration_id',row.id,'notebook_id',[activeNB]);
         close(); loadInspiration();
       };
     });
@@ -4874,6 +5037,7 @@
         const { data:{ user } }=await sb.auth.getUser();
         const titleInput=$('inTitle').value.trim();
         const { data:row }=await sb.from('inspiration').insert({ user_id:user.id, kind:'note', title:titleInput||null, content:txt, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:$('inBucket').value||null }).select().single();
+        if(row && activeNB!=='all') await setLinks('inspiration_notebook_links','inspiration_id',row.id,'notebook_id',[activeNB]);
         close(); loadInspiration();
         if(!titleInput && row && txt.length>15) autoTitleInspiration(row.id,txt);
       };
@@ -4894,7 +5058,8 @@
     const path=`${user.id}/${Date.now()}_${safe}`;
     const { error }=await sb.storage.from('Inspiration').upload(path,file);
     if(error){ toast('Upload mislukt: '+error.message); return; }
-    await sb.from('inspiration').insert({ user_id:user.id, kind:'image', image_path:path, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:activeBucket!=='all'?activeBucket:null });
+    const { data:imgRow }=await sb.from('inspiration').insert({ user_id:user.id, kind:'image', image_path:path, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:activeBucket!=='all'?activeBucket:null }).select().single();
+    if(imgRow && activeNB!=='all') await setLinks('inspiration_notebook_links','inspiration_id',imgRow.id,'notebook_id',[activeNB]);
   }
   $('inspFile').addEventListener('change',async e=>{
     for(const f of e.target.files){ await uploadInspImage(f); }
@@ -4908,7 +5073,7 @@
       const files=[...(e.dataTransfer?.files||[])];
       for(const f of files){ await uploadInspImage(f); }
       const url=e.dataTransfer?.getData('text/uri-list')||e.dataTransfer?.getData('text/plain');
-      if(url && url.startsWith('http')){ const { data:{ user } }=await sb.auth.getUser(); const kind=(ytEmbed(url)||vimeoEmbed(url))?'video':'link'; await sb.from('inspiration').insert({ user_id:user.id, kind, url, notebook_id:activeNB!=='all'?activeNB:null }); }
+      if(url && url.startsWith('http')){ const { data:{ user } }=await sb.auth.getUser(); const kind=(ytEmbed(url)||vimeoEmbed(url))?'video':'link'; const { data:pRow }=await sb.from('inspiration').insert({ user_id:user.id, kind, url, notebook_id:activeNB!=='all'?activeNB:null }).select().single(); if(pRow && activeNB!=='all') await setLinks('inspiration_notebook_links','inspiration_id',pRow.id,'notebook_id',[activeNB]); }
       loadInspiration();
     });
     document.addEventListener('paste',async e=>{
@@ -4920,7 +5085,7 @@
       }
       if(!handled){
         const txt=e.clipboardData?.getData('text');
-        if(txt && txt.startsWith('http')){ const { data:{ user } }=await sb.auth.getUser(); const kind=(ytEmbed(txt)||vimeoEmbed(txt))?'video':'link'; await sb.from('inspiration').insert({ user_id:user.id, kind, url:txt, notebook_id:activeNB!=='all'?activeNB:null }); handled=true; }
+        if(txt && txt.startsWith('http')){ const { data:{ user } }=await sb.auth.getUser(); const kind=(ytEmbed(txt)||vimeoEmbed(txt))?'video':'link'; const { data:pRow2 }=await sb.from('inspiration').insert({ user_id:user.id, kind, url:txt, notebook_id:activeNB!=='all'?activeNB:null }).select().single(); if(pRow2 && activeNB!=='all') await setLinks('inspiration_notebook_links','inspiration_id',pRow2.id,'notebook_id',[activeNB]); handled=true; }
       }
       if(handled) loadInspiration();
     });
@@ -4942,16 +5107,12 @@
         <label>Bijschrift / titel</label><input type="text" id="eiTitle" value="${esc(i.title||'')}">
         <label>Notitie</label><textarea id="eiNote" placeholder="Waarom bewaar je dit beeld?">${esc(i.content||'')}</textarea>`;
     }
-    const nbOpts=`<option value="">Geen notitieboek</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,nid)=>nid===i.notebook_id?`value="${nid}" selected`:m);
-    const currentBk=(await loadBucketLinksFor('inspiration_bucket_links','inspiration_id',[id]))[id]||[];
     const body=`${fields}
-      <label>Notitieboek</label><select id="eiNb">${nbOpts}</select>
-      <label>Buckets</label><div>${bucketChipHTML(currentBk,inspBuckets,`openInspBucketPicker('${id}')`)}</div>
       <div class="sheet-actions"><button class="act" id="eiCancel">Annuleren</button><button class="act primary" id="eiSave">Opslaan</button></div>`;
     openSheet('\u270E Vonk bewerken', body, (ov,close)=>{
       $('eiCancel').onclick=close;
       $('eiSave').onclick=async()=>{
-        const patch={ notebook_id:$('eiNb').value||null };
+        const patch={};
         if($('eiTitle')) patch.title=$('eiTitle').value.trim()||null;
         if($('eiNote')) patch.content=$('eiNote').value.trim()||null;
         if($('eiUrl')){ const u=$('eiUrl').value.trim(); patch.url=u||null; patch.kind=(ytEmbed(u)||vimeoEmbed(u))?'video':'link'; }
@@ -4989,15 +5150,21 @@
     const fn=$('feedNote'); if(!fn) return;
     if(!noteBuckets.length) await loadNoteBuckets(); else renderNoteBucketBar();
     let q=sb.from('notes').select('*',{count:'exact'}).is('recording_id',null).neq('status','deleted').order('created_at',{ascending:false}).limit(noteLimit);
-    if(activeNB!=='all') q=q.in('notebook_id',nbWithDescendants(activeNB));
+    if(activeNB!=='all'){
+      const nbIds=await itemIdsForLinkValues('note_notebook_links','note_id','notebook_id',nbWithDescendants(activeNB));
+      q=q.in('id',nbIds.length?nbIds:['00000000-0000-0000-0000-000000000000']);
+    }
     if(activeNoteBucket!=='all'){
       const ids=await itemIdsForBucket('note_bucket_links','note_id',activeNoteBucket);
       q=q.in('id',ids.length?ids:['00000000-0000-0000-0000-000000000000']);
     }
     const { data:notes, count }=await q;
-    const attByNote=await loadAttachmentsFor('note',(notes||[]).map(n=>n.id));
-    const bkByNote=await loadBucketLinksFor('note_bucket_links','note_id',(notes||[]).map(n=>n.id));
-    setCardsHTMLPreserveOpen(fn,(notes||[]).map(n=>noteCardHTML(n,attByNote[n.id],bkByNote[n.id])).join('')+loadMoreHTML('noteLimit+=50;loadNoteFeed()',(notes||[]).length,count));
+    const noteIds=(notes||[]).map(n=>n.id);
+    const attByNote=await loadAttachmentsFor('note',noteIds);
+    const bkByNote=await loadBucketLinksFor('note_bucket_links','note_id',noteIds);
+    const nbByNote=await loadLinksFor('note_notebook_links','note_id','notebook_id',noteIds);
+    const coByNote=await loadLinksFor('note_coachee_links','note_id','coachee_id',noteIds);
+    setCardsHTMLPreserveOpen(fn,(notes||[]).map(n=>noteCardHTML(n,attByNote[n.id],bkByNote[n.id],nbByNote[n.id],coByNote[n.id])).join('')+loadMoreHTML('noteLimit+=50;loadNoteFeed()',(notes||[]).length,count));
     initPendingPdfViewers();
   }
   async function openNoteBucketPicker(id){
