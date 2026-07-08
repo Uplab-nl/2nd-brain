@@ -16,6 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 <script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js';</script>
 <style>
   :root {
@@ -227,7 +228,7 @@
     .note-composer .nc-foot > div { justify-content:space-between; }
   }
   .feed { padding-bottom:80px; display:flex; flex-direction:column; gap:10px; }
-  .card { background:var(--card); border-radius:16px; box-shadow:var(--shadow-sm); border:1.5px solid var(--line); overflow:hidden; transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
+  .card { background:var(--card); border-radius:16px; box-shadow:var(--shadow-sm); border:1.5px solid var(--line); transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
   .card:hover { border-color:#dcdfec; transform:translateY(-3px); box-shadow:var(--shadow-md); }
   .card.collapsible .card-head { cursor:pointer; }
   .card .card-caret { font-size:12px; color:var(--ink-faint); transition:transform .18s; margin-left:4px; flex-shrink:0; }
@@ -416,6 +417,13 @@
   .del-chip { width:26px; height:26px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; background:#fff; border:1.5px solid var(--line); color:#e05252; cursor:pointer; flex-shrink:0; padding:0; transition:all .15s ease; }
   .del-chip svg { width:14px; height:14px; display:block; }
   .del-chip:hover { background:#fff2f2; border-color:#e05252; }
+  .menu-chip { width:26px; height:26px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; background:#fff; border:1.5px solid var(--line); color:var(--ink-soft); cursor:pointer; flex-shrink:0; padding:0; transition:all .15s ease; }
+  .menu-chip svg { width:14px; height:14px; display:block; }
+  .menu-chip:hover { border-color:var(--purple); color:var(--purple); }
+  .card-head .menu-wrap { flex-shrink:0; }
+  .undo-pill { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--purple); background:#f4f0ff; border:1.5px solid #e3d9ff; border-radius:20px; padding:6px 12px; cursor:pointer; margin-left:8px; }
+  .undo-pill:hover { background:#ece3ff; }
+  .undo-pill svg { width:13px; height:13px; display:block; }
   .tl-followup { background:#eef6ff; border:1px solid #bfdcff; border-radius:10px; padding:10px 12px; font-size:13.5px; color:var(--ink); margin:8px 0; line-height:1.5; }
   .speaker-names { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding-bottom:10px; border-bottom:1px dashed var(--line); }
   .speaker-tag { display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-faint); }
@@ -467,9 +475,9 @@
 
   /* Inspiratie masonry */
   .insp-grid { columns:3 260px; column-gap:10px; padding-bottom:80px; }
-  .insp-card { break-inside:avoid; background:var(--card); border-radius:14px; box-shadow:var(--shadow-sm); border:1.5px solid var(--line); margin-bottom:10px; overflow:hidden; transition:transform .15s,box-shadow .15s,border-color .15s; position:relative; }
+  .insp-card { break-inside:avoid; background:var(--card); border-radius:14px; box-shadow:var(--shadow-sm); border:1.5px solid var(--line); margin-bottom:10px; transition:transform .15s,box-shadow .15s,border-color .15s; position:relative; }
   .insp-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); }
-  .insp-card img { width:100%; display:block; }
+  .insp-card img { width:100%; display:block; border-radius:12px 12px 0 0; }
   .insp-card .ic-body { padding:14px 16px; }
   .insp-card .ic-title { font-weight:600; font-size:14.5px; margin-bottom:4px; word-break:break-word; }
   .insp-card .ic-note { font-size:13px; color:var(--ink-soft); white-space:pre-wrap; word-break:break-word; }
@@ -477,12 +485,12 @@
   .insp-card .ic-tools { position:absolute; top:8px; right:8px; display:flex; gap:5px; opacity:.85; transition:opacity .12s; z-index:5; }
   .insp-card:hover .ic-tools { opacity:1; }
   @media (hover:none){ .insp-card .ic-tools { opacity:1; } }
-  .insp-card .ic-tools button { border:none; width:30px; height:30px; border-radius:9px; background:rgba(255,255,255,.96); box-shadow:var(--shadow-sm); cursor:pointer; font-size:14px; line-height:1; transition:transform .1s,background .12s; }
-  .insp-card .ic-tools button:hover { transform:scale(1.1); background:#fff; }
+  .insp-card .ic-tools > button, .insp-card .ic-tools .menu-chip { border:none; width:30px; height:30px; border-radius:9px; background:rgba(255,255,255,.96); box-shadow:var(--shadow-sm); cursor:pointer; font-size:14px; line-height:1; transition:transform .1s,background .12s; }
+  .insp-card .ic-tools > button:hover, .insp-card .ic-tools .menu-chip:hover { transform:scale(1.1); background:#fff; }
   .insp-card .ic-tools button.fav-on { color:#ffc93c; }
   .insp-drop { border:2px dashed var(--line); border-radius:16px; padding:22px; text-align:center; color:var(--ink-faint); font-size:13.5px; margin-bottom:18px; transition:all .15s; }
   .insp-drop.drag { border-color:var(--purple); background:#faf8ff; color:var(--purple); }
-  .insp-video { position:relative; padding-bottom:56.25%; height:0; z-index:1; }
+  .insp-video { position:relative; padding-bottom:56.25%; height:0; z-index:1; border-radius:12px 12px 0 0; overflow:hidden; }
   .insp-video iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
   @media (max-width:700px){ .insp-grid { columns:1; } }
 
@@ -561,7 +569,7 @@
     <!-- Dashboard -->
     <div id="paneDash">
       <div class="dash-toolbar">
-        <span class="dash-hint">Sleep blokken om de volgorde te bepalen · gebruik de schakelaars om ze te tonen of verbergen.</span>
+        <span class="dash-hint" id="dashHint" title="Sleep blokken om de volgorde te bepalen · gebruik de schakelaars om ze te tonen of verbergen.">Sleep blokken om de volgorde te bepalen · gebruik de schakelaars om ze te tonen of verbergen.</span>
         <div class="menu-wrap">
           <button class="menu-btn" onclick="toggleMenu('dashMenu')" title="Meer opties">&#9776;</button>
           <div class="dropdown-menu hidden" id="dashMenu">
@@ -846,6 +854,22 @@
     });
   }
   function linkifyWiki(rawText){ return wikiLinksInEscaped(esc(rawText||'')); }
+  // Herkent kale URLs in platte tekst en maakt ze klikbaar \u2014 nodig omdat een link soms als los briefje/tekst
+  // wordt opgeslagen (i.p.v. via het aparte url-veld) en dan anders niet aanklikbaar was.
+  function linkifyUrls(rawText){
+    const text=rawText||'';
+    const urlRe=/(https?:\/\/[^\s<]+)/g;
+    let out='', last=0, m;
+    while((m=urlRe.exec(text))){
+      out+=esc(text.slice(last,m.index));
+      let url=m[1], trail='';
+      while(url.length && /[.,!?)\]]$/.test(url)){ trail=url.slice(-1)+trail; url=url.slice(0,-1); }
+      out+=`<a href="${esc(url)}" target="_blank" rel="noopener" style="color:var(--blue);word-break:break-all;">${esc(url)}</a>${esc(trail)}`;
+      last=urlRe.lastIndex;
+    }
+    out+=esc(text.slice(last));
+    return out;
+  }
   function wikiOpenCoachee(el){
     const id=el.dataset.coacheeId;
     switchTab('coach');
@@ -925,7 +949,23 @@
     return esc(out);
   }
   function toggleCard(el){
+    const wasOpen=el.classList.contains('open');
     el.classList.toggle('open');
+    if(wasOpen){
+      const noteId=el.getAttribute('data-note-id');
+      if(noteId && textUndoBuffer['note:'+noteId]!==undefined){
+        delete textUndoBuffer['note:'+noteId];
+        const p=document.getElementById('nundo-'+noteId); if(p) p.innerHTML='';
+      }
+    }
+  }
+  // Herlaadt een kaartenlijst zonder open (uitgeklapte) kaarten weer dicht te klappen \u2014 anders moet je na elke
+  // kleine wijziging (koppelen, favoriet, etc.) opnieuw klikken om je notitie/opname weer open te krijgen.
+  function setCardsHTMLPreserveOpen(container,html){
+    if(!container) return;
+    const openIds=new Set([...container.querySelectorAll('.card.open')].map(el=>el.id).filter(Boolean));
+    container.innerHTML=html;
+    if(openIds.size) openIds.forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('open'); });
   }
   function toggleDashFold(key){
     const box=document.getElementById(key+'Box'); const caret=document.getElementById(key+'Caret');
@@ -944,10 +984,27 @@
       el.innerHTML='<span style="color:var(--ink-faint);">Laden\u2026</span>';
       const [{ data:tr, error }, { data:rec }]=await Promise.all([
         sb.from('transcripts').select('full_text,segments').eq('recording_id',recId).maybeSingle(),
-        sb.from('recordings').select('speaker_names').eq('id',recId).maybeSingle()
+        sb.from('recordings').select('speaker_names,coachee_id').eq('id',recId).maybeSingle()
       ]);
       if(error||!tr){ el.innerHTML='<span style="color:var(--ink-faint);">(kon transcript niet laden)</span>'; return; }
-      el.innerHTML=renderTranscriptHTML(recId,tr,rec?.speaker_names||{});
+      let names=rec?.speaker_names||{};
+      if(Object.keys(names).length===0 && Array.isArray(tr.segments) && tr.segments.length){
+        const speakers=[...new Set(tr.segments.map(s=>s.speaker))];
+        let defaults=null;
+        if(rec?.coachee_id){
+          const { data:coachee }=await sb.from('coachees').select('default_speaker_names').eq('id',rec.coachee_id).maybeSingle();
+          const known=coachee?.default_speaker_names||{};
+          const applicable={}; speakers.forEach(sp=>{ if(known[sp]) applicable[sp]=known[sp]; });
+          if(Object.keys(applicable).length) defaults=applicable;
+        } else if(speakers.length===1){
+          defaults={ [speakers[0]]:'Daan' };
+        }
+        if(defaults){
+          names=defaults;
+          await sb.from('recordings').update({ speaker_names:names }).eq('id',recId);
+        }
+      }
+      el.innerHTML=renderTranscriptHTML(recId,tr,names);
     }
   }
   function renderTranscriptHTML(recId,tr,names){
@@ -965,10 +1022,17 @@
   }
   async function setSpeakerName(recId,input){
     const speaker=input.dataset.speaker, name=input.value.trim();
-    const { data:rec }=await sb.from('recordings').select('speaker_names').eq('id',recId).maybeSingle();
+    const { data:rec }=await sb.from('recordings').select('speaker_names,coachee_id').eq('id',recId).maybeSingle();
     const names=rec?.speaker_names||{};
     if(name) names[speaker]=name; else delete names[speaker];
     await sb.from('recordings').update({ speaker_names:names }).eq('id',recId);
+    // Onthouden voor de volgende keer: koppel deze sprekernaam aan de coachee (indien gekoppeld)
+    if(rec?.coachee_id && name){
+      const { data:coachee }=await sb.from('coachees').select('default_speaker_names').eq('id',rec.coachee_id).maybeSingle();
+      const known=coachee?.default_speaker_names||{};
+      known[speaker]=name;
+      await sb.from('coachees').update({ default_speaker_names:known }).eq('id',rec.coachee_id);
+    }
     // Transcript direct opnieuw tekenen met de nieuwe naam, zonder de hele kaart te herladen
     const el=document.getElementById('tx-'+recId); if(!el) return;
     const { data:tr }=await sb.from('transcripts').select('full_text,segments').eq('recording_id',recId).maybeSingle();
@@ -1027,8 +1091,8 @@
   let showArchived=false;
   async function loadNotebooks(){
     const { data }=await sb.from('notebooks').select('*').order('position').order('created_at');
-    allNotebooks=data||[];
-    notebooks=showArchived?allNotebooks:allNotebooks.filter(n=>!n.archived);
+    allNotebooks=(data||[]).sort((a,b)=>(a.name||'').localeCompare(b.name||'','nl',{sensitivity:'base'}));
+    notebooks=allNotebooks.filter(n=>!n.archived);
     renderTree();
     const opts=`<option value="">Geen notitieboek</option>`+notebookOptions();
     $('noteNotebook').innerHTML=opts;
@@ -1078,9 +1142,21 @@
     }
     html+=branch('root',0);
     html+=`<div class="nb-addroot" onclick="newNotebook(null)"><span class="nb-caret">+</span> Nieuw notitieboek</div>`;
-    const archCount=allNotebooks.filter(n=>n.archived).length;
-    if(archCount>0){
-      html+=`<div class="nb-addroot" onclick="toggleShowArchived()" style="border-top:1px solid var(--line);margin-top:4px;padding-top:10px;">${showArchived?'\u25BC':'\u25B6'} Archief (${archCount})</div>`;
+    const archived=allNotebooks.filter(n=>n.archived);
+    if(archived.length>0){
+      html+=`<div class="nb-addroot" onclick="toggleShowArchived()" style="border-top:1px solid var(--line);margin-top:4px;padding-top:10px;">${showArchived?'\u25BC':'\u25B6'} Archief (${archived.length})</div>`;
+      if(showArchived){
+        html+=`<div class="nb-children">`+archived.map(n=>`
+          <div class="nb-row" style="opacity:.65;cursor:default;" onclick="event.stopPropagation()">
+            <span class="nb-caret leaf"></span>
+            <span class="nb-dot" style="background:${n.color||'#8a5cff'}"></span>
+            <span class="nb-name">${esc(n.name)}</span>
+            <span class="nb-tools">
+              <span class="nb-mini" title="Terughalen uit archief" onclick="event.stopPropagation();toggleArchive('${n.id}')">\u21a9</span>
+              <span class="nb-mini" title="Verwijderen" onclick="event.stopPropagation();deleteNB('${n.id}')">\u2715</span>
+            </span>
+          </div>`).join('')+`</div>`;
+      }
     }
     tree.innerHTML=html;
   }
@@ -1210,7 +1286,7 @@
     await loadNotebooks();
   }
 
-  function toggleShowArchived(){ showArchived=!showArchived; loadNotebooks(); }
+  function toggleShowArchived(){ showArchived=!showArchived; renderTree(); }
 
   async function toggleArchive(id){
     const nb=nbById(id); if(!nb) return;
@@ -1289,6 +1365,10 @@
   // ---- Herbruikbare kaart-HTML (gedeeld door tab, notitieboek-view en favorieten) ----
   function starHTML(kind,id,on){ return `<button class="star ${on?'on':''}" title="Favoriet" onclick="event.stopPropagation();toggleFav('${kind}','${id}',this)">${on?'\u2605':'\u2606'}</button>`; }
   function delChipHTML(onclickJs){ return `<button class="del-chip" onclick="event.stopPropagation();${onclickJs}" title="Verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></button>`; }
+  // Herbruikbaar kaart-menu: hamburger-chip rechtsboven + dropdown eronder, zelfde stijl overal, inhoud verschilt per type
+  function cardMenuHTML(menuId,itemsHTML){
+    return `<div class="menu-wrap"><button class="menu-chip" onclick="event.stopPropagation();toggleMenu('${menuId}')" title="Meer opties">${ICO.hamburger}</button><div class="dropdown-menu hidden" id="${menuId}" onclick="event.stopPropagation()">${itemsHTML}</div></div>`;
+  }
   // ---- Herbruikbare icoon-chips voor knoppen: wit blijft de basis, het kleurtje zit alleen in het chipje ----
   function mi(bg,svg){ return `<span class="mi" style="background:${bg}">${svg}</span>`; }
   // ================= MULTI-BUCKET SYSTEEM (herbruikbaar voor notities/opnames/boeken/inspiratie/mindmaps) =================
@@ -1345,6 +1425,9 @@
     chart:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-6 3 3 5-8"/></svg>`,
     chat:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.8-.9L3 20l1.1-4.3a8.4 8.4 0 0 1 15.9-4.2z"/></svg>`,
     palette:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2s-.5-1.5-.5-2.5S14 15 15 15h3a3 3 0 0 0 3-3c0-5-4-9-9-9z"/><circle cx="7.5" cy="10.5" r="1.1"/><circle cx="12" cy="7.5" r="1.1"/><circle cx="16.5" cy="10.5" r="1.1"/></svg>`,
+    hamburger:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`,
+    download:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m7 11 5 5 5-5"/><path d="M4 19.5V20a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-.5"/></svg>`,
+    undo:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`,
   };
   const COL={ rec:'linear-gradient(135deg,#ff6b5a,#ff5a8a)', note:'linear-gradient(135deg,#ff5adb,#ff9f43)', map:'linear-gradient(135deg,#7367f0,#5a9cff)', book:'linear-gradient(135deg,#ff9f43,#ff6b5a)', doc:'linear-gradient(135deg,#3b82f6,#6366f1)', danger:'linear-gradient(135deg,#ff6b5a,#e05252)', neutral:'linear-gradient(135deg,#9aa3b2,#6b7280)', dain:'var(--grad-purple)', green:'linear-gradient(135deg,#549E39,#7ac142)', coach:'linear-gradient(135deg,#5a9cff,#7367f0)' };
 
@@ -1378,9 +1461,12 @@
       btns+=tplPick+`<button class="act primary" onclick="summarizeWithTpl('${r.id}',this)">${mi(COL.dain,ICO.sparkle)}${r.status==='summarized'?'Opnieuw samenvatten':'Laat Dain samenvatten'}</button>`;
     }
     if(hasTranscript) btns+=`<button class="act" onclick="openVisualReport('${r.id}')">${mi(COL.green,ICO.palette)}Visueel verslag${vrIds.has(r.id)?'':' maken'}</button>`;
-    btns+=`<button class="act" onclick="openRecLinks('${r.id}','${r.notebook_id||''}','${r.coachee_id||''}','${r.bucket_id||''}','${r.appointment_id||''}')">${mi(COL.neutral,ICO.link)}Koppelen</button>`;
-    if(hasTranscript) btns+=`<button class="act" onclick="event.stopPropagation();openRelated('recording','${r.id}')">${mi(COL.dain,ICO.link)}Gerelateerd</button>`;
-    if(r.status==='summarized') btns+=`<button class="act" onclick="event.stopPropagation();shareWithCoachee('${r.id}')">${mi(COL.green,ICO.link)}Deel met coachee</button>`;
+    const menuId=`rmenu-${r.id}`;
+    let menuItems=`<button class="act" onclick="openRecLinks('${r.id}','${r.notebook_id||''}','${r.coachee_id||''}','${r.bucket_id||''}','${r.appointment_id||''}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>`;
+    if(hasTranscript) menuItems+=`<button class="act" onclick="event.stopPropagation();openRelated('recording','${r.id}');toggleMenu('${menuId}')">${mi(COL.dain,ICO.link)}Gerelateerd</button>`;
+    if(r.status==='summarized') menuItems+=`<button class="act" onclick="event.stopPropagation();shareWithCoachee('${r.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.link)}Deel met coachee</button>`;
+    menuItems+=`<button class="act" onclick="shareItem('recording','${r.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>`;
+    menuItems+=`<button class="act danger" onclick="askDeleteRecording('${r.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
     const nb2=nb?`<span class="nb-tag"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>`:'';
     const tpl=templates.find(t=>t.id===r.template_id);
     const tplTag=tpl?`<span class="tpl-tag">\u25A4 ${esc(tpl.name)}</span>`:'';
@@ -1391,14 +1477,14 @@
     const playBtn=`<button class="play-mini" title="Beluister opname" onclick="event.stopPropagation();playAudio('${r.id}',this)">\u25B6</button>`;
     const previewTxt=preview2((sectionRows[0]?.content)||summary||'');
     const audioRow=`<div class="audio-row" id="audio-${r.id}"></div>`;
-    return `<article class="card collapsible" data-rec-id="${r.id}" onclick="toggleCard(this)">
+    return `<article class="card collapsible" id="rec-${r.id}" data-rec-id="${r.id}" onclick="toggleCard(this)">
       <div class="card-head">
         <div style="display:flex;align-items:flex-start;gap:12px;flex:1;">
           ${playBtn}
           <div><div class="card-title">${esc(r.title||'Naamloze opname')} <button class="rename-btn" onclick="event.stopPropagation();renameRecording('${r.id}','${escJs(r.title||'')}')" title="Titel wijzigen">\u270E</button>${r.title_is_auto?`<span class="tpl-tag" style="margin-left:4px;" title="Dain past deze titel automatisch aan zodra hij opnieuw analyseert \u2014 totdat je 'm zelf wijzigt">\u2728 auto-titel</span>`:''}</div><div class="card-meta">${when} \u00b7 ${esc(r.source)} ${nb2} ${coTag} ${tplTag} ${bkTag}</div></div>
         </div>
         ${starHTML('recordings',r.id,r.favorite)}
-        ${delChipHTML(`askDeleteRecording('${r.id}',this)`)}
+        ${cardMenuHTML(menuId,menuItems)}
         <span class="pill ${r.status}">${pillLabel[r.status]||r.status}</span>
         <span class="card-caret">\u25B6</span>
       </div>
@@ -1426,33 +1512,52 @@
     const thumbHTML=thumb?`<img src="${thumb.url}" class="note-thumb" alt="">`:'';
     const inlineIds=new Set([...(n.content||'').matchAll(/\[\[img:([a-zA-Z0-9-]+)\]\]/g)].map(m=>m[1]));
     const looseAtts=atts.filter(a=>!inlineIds.has(a.id));
-    const delBtn=delChipHTML(`askDeleteNote('${n.id}',this)`);
-    return `<article class="card collapsible" id="note-${n.id}" onclick="toggleCard(this)">
-      <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(n.title||'Naamloze notitie')}</div><div class="card-meta">${when} ${nbTag} ${coTag}</div></div>${thumbHTML}${starHTML('notes',n.id,n.favorite)}${delBtn}<span class="pill note">notitie</span><span class="card-caret">\u25B6</span></div>
+    const menuId=`nmenu-${n.id}`;
+    const menuItems=`
+      <button class="act" onclick="pickAttachment('note','${n.id}');toggleMenu('${menuId}')">${mi(COL.note,ICO.clip)}Bijlage</button>
+      <button class="act" onclick="toggleInlineSection('nlinks-${n.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>
+      <button class="act" onclick="openRelated('note','${n.id}');toggleMenu('${menuId}')">${mi(COL.dain,ICO.link)}Gerelateerd</button>
+      <button class="act" onclick="improveNoteText('${n.id}',this);toggleMenu('${menuId}')">${mi(COL.dain,ICO.sparkle)}Verbeter tekst</button>
+      <button class="act" onclick="shareItem('note','${n.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
+      <button class="act danger" onclick="askDeleteNote('${n.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
+    return `<article class="card collapsible" id="note-${n.id}" data-note-id="${n.id}" onclick="toggleCard(this)">
+      <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(n.title||'Naamloze notitie')} <span id="nundo-${n.id}"></span></div><div class="card-meta">${when} ${nbTag} ${coTag}</div></div>${thumbHTML}${starHTML('notes',n.id,n.favorite)}${cardMenuHTML(menuId,menuItems)}<span class="pill note">notitie</span><span class="card-caret">\u25B6</span></div>
       ${prev?`<div class="card-preview">${prev}</div>`:''}
       <div class="card-body" onclick="event.stopPropagation()">
         <input type="text" class="note-inline-title" id="ninlt-${n.id}" value="${esc(n.title||'')}" placeholder="Titel" oninput="scheduleNoteSave('${n.id}')">
         <div class="note-inline-content" id="ninlc-${n.id}" contenteditable="true" data-placeholder="Schrijf hier je gedachte\u2026 (plak gerust een afbeelding)" oninput="scheduleNoteSave('${n.id}')" onpaste="handleNotePaste(event,'${n.id}')">${renderNoteContentHTML(n.content,atts)}</div>
         <span class="save-status" id="nstat-${n.id}"></span>
         <div id="noteatt-${n.id}">${attachmentsBlockHTML(looseAtts)}</div>
-        <div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;">${nbPick} ${coachPick} ${bkPick}</div>
-      </div>
-      <div class="card-actions" onclick="event.stopPropagation()">
-        <button class="act" onclick="pickAttachment('note','${n.id}')">${mi(COL.note,ICO.clip)}Bijlage</button>
-        <button class="act" onclick="openRelated('note','${n.id}')">${mi(COL.dain,ICO.link)}Gerelateerd</button>
+        <div id="nlinks-${n.id}" class="hidden">
+          <div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;">${nbPick} ${coachPick} ${bkPick}</div>
+        </div>
       </div></article>`;
+  }
+  function toggleInlineSection(id){
+    const el=document.getElementById(id); if(!el) return;
+    el.classList.toggle('hidden');
   }
 
   function mapCardHTML(m){
     const when=new Date(m.updated_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
-    const bkPick=`<button class="act" onclick="event.stopPropagation();openMmBucketPicker('${m.id}')">${mi(COL.neutral,ICO.link)}Buckets</button>`;
-    return `<article class="card open"><div class="card-head"><div style="flex:1;cursor:pointer;" onclick="openMap('${m.id}','${escJs(m.title)}')"><div class="card-title">${esc(m.title)}</div><div class="card-meta">Laatst bewerkt ${when}</div></div>${starHTML('mindmaps',m.id,m.favorite)}${delChipHTML(`askDeleteMindmap('${m.id}',this)`)}<span class="pill summarized">mindmap</span></div>
-      <div class="card-actions" onclick="event.stopPropagation()">${bkPick}<button class="act primary" onclick="openMap('${m.id}','${escJs(m.title)}')">${mi(COL.map,ICO.link)}Openen</button></div></article>`;
+    const menuId=`mmenu-${m.id}`;
+    const menuItems=`
+      <button class="act" onclick="event.stopPropagation();openMmBucketPicker('${m.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Buckets</button>
+      <button class="act" onclick="event.stopPropagation();shareItem('mindmap','${m.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
+      <button class="act danger" onclick="event.stopPropagation();askDeleteMindmap('${m.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
+    return `<article class="card open"><div class="card-head"><div style="flex:1;cursor:pointer;" onclick="openMap('${m.id}','${escJs(m.title)}')"><div class="card-title">${esc(m.title)}</div><div class="card-meta">Laatst bewerkt ${when}</div></div>${starHTML('mindmaps',m.id,m.favorite)}${cardMenuHTML(menuId,menuItems)}<span class="pill summarized">mindmap</span></div>
+      <div class="card-actions" onclick="event.stopPropagation()"><button class="act primary" onclick="openMap('${m.id}','${escJs(m.title)}')">${mi(COL.map,ICO.link)}Openen</button></div></article>`;
   }
 
   function bookCardHTML(b,bucketIds){
-    return `<article class="card collapsible" onclick="toggleCard(this)">
-      <div class="card-head"><div style="display:flex;align-items:center;gap:14px;flex:1;"><span class="bk-cover"></span><div><div class="card-title">${esc(b.title)}</div><div class="card-meta">${b.author?esc(b.author):'Onbekende auteur'}</div></div></div>${starHTML('book_summaries',b.id,b.favorite)}<button class="del-chip" style="color:var(--ink-soft);" onclick="event.stopPropagation();editBook('${b.id}','${escJs(b.title||'')}','${escJs(b.author||'')}')" title="Titel/auteur wijzigen">${ICO.pencil}</button>${delChipHTML(`delBook('${b.id}',this)`)}<span class="pill ${b.status==='summarized'?'summarized':'uploaded'}">${b.status==='summarized'?'samengevat':'concept'}</span><span class="card-caret">\u25B6</span></div>
+    const menuId=`bmenu-${b.id}`;
+    const menuItems=`
+      <button class="act" onclick="event.stopPropagation();editBook('${b.id}','${escJs(b.title||'')}','${escJs(b.author||'')}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.pencil)}Titel/auteur wijzigen</button>
+      <button class="act" onclick="toggleInlineSection('blinks-${b.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>
+      <button class="act" onclick="shareItem('book','${b.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
+      <button class="act danger" onclick="delBook('${b.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
+    return `<article class="card collapsible" id="book-${b.id}" onclick="toggleCard(this)">
+      <div class="card-head"><div style="display:flex;align-items:center;gap:14px;flex:1;"><span class="bk-cover"></span><div><div class="card-title">${esc(b.title)}</div><div class="card-meta">${b.author?esc(b.author):'Onbekende auteur'}</div></div></div>${starHTML('book_summaries',b.id,b.favorite)}${cardMenuHTML(menuId,menuItems)}<span class="pill ${b.status==='summarized'?'summarized':'uploaded'}">${b.status==='summarized'?'samengevat':'concept'}</span><span class="card-caret">\u25B6</span></div>
       ${b.ai_summary?`<div class="card-preview">${preview2(b.ai_summary)}</div>`:''}
       <div class="card-body" onclick="event.stopPropagation()">${bookBodyHTML(b,bucketIds)}</div>
       <div class="card-actions" onclick="event.stopPropagation()">${b.status!=='summarized'?`<button class="act primary" onclick="summarizeBook('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Laat Dain analyseren</button>`:`<button class="act" onclick="summarizeBook('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Opnieuw analyseren</button>`}</div></article>`;
@@ -1476,7 +1581,7 @@
     if(error){ conn.textContent='fout'; feed.innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
     conn.textContent=`\u25CF ${count??recs.length} opname${(count??recs.length)===1?'':'s'}`;
     if(!recs.length){ feed.innerHTML=`<div class="empty"><div class="big">Nog geen opnames</div><p>${activeRecBucket==='all'?'Upload hierboven een audiobestand om te beginnen.':'Deze bucket is nog leeg.'}</p></div>`; return; }
-    feed.innerHTML=recs.map(recCardHTML).join('')+loadMoreHTML('recLimit+=50;loadRecordings()',recs.length,count);
+    setCardsHTMLPreserveOpen(feed,recs.map(recCardHTML).join('')+loadMoreHTML('recLimit+=50;loadRecordings()',recs.length,count));
   }
 
   // "Laad meer"-knop voor gepagineerde feeds
@@ -1495,10 +1600,10 @@
     conn.textContent=`\u25CF ${count??notes.length} notitie${(count??notes.length)===1?'':'s'}`;
     if(!notes.length){ feed.innerHTML=''; if($('feedNote')) $('feedNote').innerHTML=`<div class="empty"><div class="big">Nog geen notities</div><p>Schrijf hierboven je eerste losse notitie.</p></div>`; return; }
     feed.innerHTML='';
-    if($('feedNote')) $('feedNote').innerHTML=notes.map(noteCardHTML).join('')+loadMoreHTML('noteLimit+=50;loadNoteFeed()',notes.length,count);
+    if($('feedNote')) setCardsHTMLPreserveOpen($('feedNote'),notes.map(noteCardHTML).join('')+loadMoreHTML('noteLimit+=50;loadNoteFeed()',notes.length,count));
   }
 
-  async function setNoteCoachee(id,cid){ await sb.from('notes').update({ coachee_id:cid||null }).eq('id',id); }
+  async function setNoteCoachee(id,cid){ await sb.from('notes').update({ coachee_id:cid||null }).eq('id',id); loadNoteFeed(); }
 
   // ---- Favorieten ----
   async function toggleFav(table,id,btn){
@@ -1566,7 +1671,7 @@
 
   async function setNoteNotebook(id,nbId){
     await sb.from('notes').update({ notebook_id:nbId||null }).eq('id',id);
-    await load();
+    loadNoteFeed();
   }
 
   const editTimers={};
@@ -1882,6 +1987,216 @@
     if(!atts||!atts.length) return '';
     return `<div class="section-label"><span>Bijlagen</span></div>`+atts.map(attachmentHTML).join('');
   }
+
+  // ================= Download & delen =================
+  function slugFile(s){ return (s||'bestand').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60)||'bestand'; }
+  async function fetchBytesFromUrl(url){
+    const res=await fetch(url);
+    if(!res.ok) throw new Error('kon bestand niet ophalen');
+    return new Uint8Array(await res.arrayBuffer());
+  }
+  function mmNodeOutline(nodes,parentId,depth){
+    const children=nodes.filter(n=>(n.parent_id||null)===parentId).sort((a,b)=>(a.y||0)-(b.y||0));
+    let out='';
+    children.forEach(n=>{
+      out+='  '.repeat(depth)+'- '+(n.label||'')+(n.note?` (${n.note})`:'')+'\n';
+      out+=mmNodeOutline(nodes,n.id,depth+1);
+    });
+    return out;
+  }
+  async function buildShareContent(kind,id){
+    if(kind==='note'){
+      const { data:n }=await sb.from('notes').select('title,content').eq('id',id).single();
+      const atts=(await loadAttachmentsFor('note',[id]))[id]||[];
+      const plain=(n.content||'').replace(/\[\[img:[a-zA-Z0-9-]+\]\]/g,'[afbeelding]');
+      return { text:`${n.title||'Naamloze notitie'}\n\n${plain}`, filename:slugFile(n.title), attachments:atts.map(a=>({name:a.file_name||('bijlage-'+a.id),url:a.url})) };
+    }
+    if(kind==='recording'){
+      const { data:r }=await sb.from('recordings').select('title').eq('id',id).single();
+      const { data:tr }=await sb.from('transcripts').select('full_text').eq('recording_id',id).maybeSingle();
+      const { data:sums }=await sb.from('summaries').select('kind,title,content,sort_order').eq('recording_id',id).order('sort_order',{ascending:true});
+      const { data:actions }=await sb.from('action_items').select('content').eq('recording_id',id);
+      let text=`${r?.title||'Naamloze opname'}\n`;
+      (sums||[]).forEach(s=>{ text+=`\n${s.title||'Samenvatting'}\n${s.content||''}\n`; });
+      if(actions && actions.length) text+=`\nActie-items\n`+actions.map(a=>'- '+a.content).join('\n')+'\n';
+      if(tr?.full_text) text+=`\nTranscriptie\n${tr.full_text}\n`;
+      return { text, filename:slugFile(r?.title), attachments:[] };
+    }
+    if(kind==='mindmap'){
+      const { data:m }=await sb.from('mindmaps').select('title').eq('id',id).single();
+      const { data:nodes }=await sb.from('mindmap_nodes').select('id,parent_id,label,note,y').eq('mindmap_id',id);
+      const outline=mmNodeOutline(nodes||[],null,0);
+      return { text:`${m?.title||'Mindmap'}\n\n${outline}`, filename:slugFile(m?.title), attachments:[] };
+    }
+    if(kind==='book'){
+      const { data:b }=await sb.from('book_summaries').select('*').eq('id',id).single();
+      let text=`${b?.title||'Boek'}${b?.author?' \u2014 '+b.author:''}\n`;
+      const sec=(label,val)=>{ if(val) text+=`\n${label}\n${val}\n`; };
+      sec('Samenvatting door Dain',b?.ai_summary); sec('Belangrijkste inzichten',b?.key_insights); sec('Quotes',b?.quotes);
+      sec('Hoofdstukken',b?.chapters); sec('Oefeningen',b?.exercises); sec('Kritiek',b?.critique); sec('Verbanden',b?.connections);
+      sec('Mijn belangrijkste inzichten',b?.my_insights);
+      return { text, filename:slugFile(b?.title), attachments:[] };
+    }
+    if(kind==='document'){
+      const { data:d }=await sb.from('documents').select('*').eq('id',id).single();
+      let text=`${d?.title||d?.file_name||'Document'}\n`;
+      if(d?.ai_summary) text+=`\nSamenvatting van Dain\n${d.ai_summary}\n`;
+      if(d?.key_points) text+=`\nKernpunten\n${d.key_points}\n`;
+      if(d?.my_notes) text+=`\nMijn notities\n${d.my_notes}\n`;
+      let attachments=[];
+      if(d?.file_path){
+        const { data:signed }=await sb.storage.from('Documents').createSignedUrl(d.file_path,3600);
+        if(signed?.signedUrl) attachments.push({ name:d.file_name||'document', url:signed.signedUrl });
+      }
+      return { text, filename:slugFile(d?.title||d?.file_name), attachments };
+    }
+    if(kind==='inspiration'){
+      const { data:i }=await sb.from('inspiration').select('*').eq('id',id).single();
+      let text=`${i?.title||'Inspiratie'}\n`;
+      if(i?.content) text+=`\n${i.content}\n`;
+      if(i?.url) text+=`\n${i.url}\n`;
+      let attachments=((await loadAttachmentsFor('inspiration',[id]))[id]||[]).map(a=>({name:a.file_name||('bijlage-'+a.id),url:a.url}));
+      if(i?.image_path){
+        const { data:signed }=await sb.storage.from('Inspiration').createSignedUrl(i.image_path,3600);
+        if(signed?.signedUrl) attachments.push({ name:'afbeelding.jpg', url:signed.signedUrl });
+      }
+      return { text, filename:slugFile(i?.title||'inspiratie'), attachments };
+    }
+    if(kind==='coachee'){
+      const { data:c }=await sb.from('coachees').select('name,email,notes,personal').eq('id',id).single();
+      let text=`${c?.name||'Coachee'}${c?.email?' \u2014 '+c.email:''}\n`;
+      if(c?.notes) text+=`\nProfiel & context\n${c.notes}\n`;
+      if(c?.personal) text+=`\nPersoonlijke info\n${c.personal}\n`;
+      return { text, filename:slugFile(c?.name), attachments:[] };
+    }
+    throw new Error('onbekend type: '+kind);
+  }
+  async function shareItem(kind,id){
+    try{
+      toast('Bezig met voorbereiden\u2026');
+      const { text, filename, attachments }=await buildShareContent(kind,id);
+      let clipboardOk=true;
+      try{ await navigator.clipboard.writeText(text); }catch(e){ clipboardOk=false; }
+      if(attachments && attachments.length && window.fflate){
+        const zipObj={};
+        zipObj[(filename||'bestand')+'.txt']=fflate.strToU8(text);
+        for(const a of attachments){
+          try{
+            const bytes=await fetchBytesFromUrl(a.url);
+            let name=(a.name||'bijlage').replace(/[^a-zA-Z0-9._-]/g,'_');
+            let finalName=name, n2=1;
+            while(zipObj[finalName]){ finalName=n2+'_'+name; n2++; }
+            zipObj[finalName]=bytes;
+          }catch(e){ /* deze bijlage overslaan als 'm niet op te halen is */ }
+        }
+        const zipped=fflate.zipSync(zipObj);
+        const blob=new Blob([zipped],{ type:'application/zip' });
+        const url=URL.createObjectURL(blob);
+        const a2=document.createElement('a'); a2.href=url; a2.download=(filename||'bestand')+'.zip'; a2.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const blob=new Blob([text],{ type:'text/plain' });
+        const url=URL.createObjectURL(blob);
+        const a2=document.createElement('a'); a2.href=url; a2.download=(filename||'bestand')+'.txt'; a2.click();
+        URL.revokeObjectURL(url);
+      }
+      toast(clipboardOk?'Gedownload \u2014 tekst staat ook op je klembord, plak \'m in WhatsApp of mail':'Gedownload \u2014 klembord kopi\u00ebren lukte niet, kopieer de tekst uit het bestand');
+    }catch(e){
+      toast('Downloaden/delen mislukt: '+e.message);
+    }
+  }
+
+  // ================= Verbeter tekst (Dain corrigeert spelling/zinsbouw \u2014 ongedaan te maken) =================
+  const textUndoBuffer={};
+  async function callImproveText(text){
+    const { data, error }=await sb.functions.invoke('improve-text',{ body:{ text } });
+    if(error) throw new Error(error.message||'Verbeteren mislukt');
+    if(data?.error) throw new Error(data.error);
+    if(!data?.text) throw new Error('Geen resultaat ontvangen');
+    return data.text;
+  }
+  function renderUndoPill(bufferKey,holderId,undoFn){
+    const holder=document.getElementById(holderId); if(!holder) return;
+    holder.innerHTML=textUndoBuffer[bufferKey]!==undefined?`<span class="undo-pill" onclick="${undoFn}">${ICO.undo} Herstel origineel</span>`:'';
+  }
+  async function improveNoteText(id,btn){
+    const el=document.getElementById('ninlc-'+id); if(!el) return;
+    const original=serializeNoteContent(el);
+    if(!original.trim()){ toast('Nog geen tekst om te verbeteren.'); return; }
+    if(btn) btn.disabled=true;
+    toast('Dain checkt je tekst\u2026');
+    try{
+      const improved=await callImproveText(original);
+      textUndoBuffer['note:'+id]=original;
+      const atts=(await loadAttachmentsFor('note',[id]))[id]||[];
+      el.innerHTML=renderNoteContentHTML(improved,atts);
+      await sb.from('notes').update({ content:improved }).eq('id',id);
+      renderUndoPill('note:'+id,'nundo-'+id,`undoImproveNoteText('${id}')`);
+      toast('Klaar \u2014 kleine foutjes eruit gehaald');
+    }catch(e){
+      toast('Verbeteren mislukt: '+e.message);
+    }
+    if(btn) btn.disabled=false;
+  }
+  async function undoImproveNoteText(id){
+    const original=textUndoBuffer['note:'+id]; if(original===undefined) return;
+    const el=document.getElementById('ninlc-'+id); if(!el) return;
+    const atts=(await loadAttachmentsFor('note',[id]))[id]||[];
+    el.innerHTML=renderNoteContentHTML(original,atts);
+    await sb.from('notes').update({ content:original }).eq('id',id);
+    delete textUndoBuffer['note:'+id];
+    renderUndoPill('note:'+id,'nundo-'+id,`undoImproveNoteText('${id}')`);
+    toast('Teruggezet naar je eigen tekst');
+  }
+  async function improveBookInsights(id,btn){
+    const el=document.getElementById('bkins-'+id); if(!el) return;
+    const original=el.value;
+    if(!original.trim()){ toast('Nog geen tekst om te verbeteren.'); return; }
+    if(btn) btn.disabled=true;
+    toast('Dain checkt je tekst\u2026');
+    try{
+      const improved=await callImproveText(original);
+      textUndoBuffer['book:'+id]=original;
+      el.value=improved;
+      await sb.from('book_summaries').update({ my_insights:improved }).eq('id',id);
+      renderUndoPill('book:'+id,'bundo-'+id,`undoImproveBookInsights('${id}')`);
+      toast('Klaar \u2014 kleine foutjes eruit gehaald');
+    }catch(e){ toast('Verbeteren mislukt: '+e.message); }
+    if(btn) btn.disabled=false;
+  }
+  async function undoImproveBookInsights(id){
+    const original=textUndoBuffer['book:'+id]; if(original===undefined) return;
+    const el=document.getElementById('bkins-'+id); if(el) el.value=original;
+    await sb.from('book_summaries').update({ my_insights:original }).eq('id',id);
+    delete textUndoBuffer['book:'+id];
+    renderUndoPill('book:'+id,'bundo-'+id,`undoImproveBookInsights('${id}')`);
+    toast('Teruggezet naar je eigen tekst');
+  }
+  async function improveDocNotes(id,btn){
+    const el=document.getElementById('docnote-'+id); if(!el) return;
+    const original=el.value;
+    if(!original.trim()){ toast('Nog geen tekst om te verbeteren.'); return; }
+    if(btn) btn.disabled=true;
+    toast('Dain checkt je tekst\u2026');
+    try{
+      const improved=await callImproveText(original);
+      textUndoBuffer['doc:'+id]=original;
+      el.value=improved;
+      await sb.from('documents').update({ my_notes:improved }).eq('id',id);
+      renderUndoPill('doc:'+id,'dundo-'+id,`undoImproveDocNotes('${id}')`);
+      toast('Klaar \u2014 kleine foutjes eruit gehaald');
+    }catch(e){ toast('Verbeteren mislukt: '+e.message); }
+    if(btn) btn.disabled=false;
+  }
+  async function undoImproveDocNotes(id){
+    const original=textUndoBuffer['doc:'+id]; if(original===undefined) return;
+    const el=document.getElementById('docnote-'+id); if(el) el.value=original;
+    await sb.from('documents').update({ my_notes:original }).eq('id',id);
+    delete textUndoBuffer['doc:'+id];
+    renderUndoPill('doc:'+id,'dundo-'+id,`undoImproveDocNotes('${id}')`);
+    toast('Teruggezet naar je eigen tekst');
+  }
+
   const pdfState={};
   function initPendingPdfViewers(){
     if(!window.pdfjsLib) return;
@@ -2217,10 +2532,13 @@
     const bkByMap=await loadBucketLinksFor('mindmap_bucket_links','mindmap_id',maps.map(m=>m.id));
     $('mapCards').innerHTML=maps.map(m=>{
       const when=new Date(m.updated_at).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
-      const bkPick=bucketChipHTML(bkByMap[m.id]||[],mmBuckets,`openMmBucketPicker('${m.id}')`);
+      const menuId=`mmenu2-${m.id}`;
+      const menuItems=`
+        <button class="act" onclick="openMmBucketPicker('${m.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Buckets</button>
+        <button class="act" onclick="shareItem('mindmap','${m.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
+        <button class="act danger" onclick="askDeleteMindmap('${m.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
       return `<article class="card open" style="cursor:pointer;" onclick="openMap('${m.id}','${escJs(m.title)}')">
-        <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(m.title)}</div><div class="card-meta">Laatst bewerkt ${when}</div></div>${starHTML('mindmaps',m.id,m.favorite)}${delChipHTML(`askDeleteMindmap('${m.id}',this)`)}<span class="pill summarized">mindmap</span></div>
-        <div class="card-actions" onclick="event.stopPropagation()">${bkPick}</div>
+        <div class="card-head"><div style="flex:1;"><div class="card-title">${esc(m.title)}</div><div class="card-meta">Laatst bewerkt ${when}</div></div>${starHTML('mindmaps',m.id,m.favorite)}${cardMenuHTML(menuId,menuItems)}<span class="pill summarized">mindmap</span></div>
       </article>`;
     }).join('');
   }
@@ -2588,7 +2906,7 @@
     conn.textContent=`\u25CF ${coachees.length} coachee${coachees.length===1?'':'s'}`;
     const patternBtn=coachees.length>1?`<div style="margin-bottom:16px;"><button class="act primary" onclick="crossCoacheePatterns()">${mi(COL.dain,ICO.sparkle)}Dain: patronen over al mijn coachees</button></div>`:'';
     if(!coachees.length){ $('coCards').innerHTML=`<div class="empty"><div class="big">Nog geen coachees</div><p>Voeg hierboven je eerste coachee toe.</p></div>`; return; }
-    $('coCards').innerHTML=patternBtn+coachees.map(c=>{
+    setCardsHTMLPreserveOpen($('coCards'),patternBtn+coachees.map(c=>{
       const initials=(c.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
       const n=counts[c.id]||0;
       const prof=esc(c.notes||'');
@@ -2597,14 +2915,19 @@
       const previewBits=[];
       if((c.notes||'').trim()) previewBits.push(preview2(c.notes));
       const prevTxt=previewBits.length?previewBits.join(' '):'Klik om profiel, persoonlijke info en labboek te openen.';
-      return `<article class="card collapsible" onclick="toggleCard(this)">
+      const menuId=`comenu-${c.id}`;
+      const menuItems=`
+        <button class="act" onclick="editCoachee('${c.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.pencil)}Wijzig</button>
+        <button class="act" onclick="shareItem('coachee','${c.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
+        <button class="act danger" onclick="delCoachee('${c.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
+      return `<article class="card collapsible" id="coachee-${c.id}" onclick="toggleCard(this)">
         <div class="card-head">
           <div style="display:flex;align-items:center;gap:12px;flex:1;">
             <span class="co-avatar">${esc(initials)}</span>
             <div><div class="card-title">${esc(c.name)}${c.favorite?' <span class="badge-fav">\u2605 favoriet</span>':''}</div><div class="card-meta">${c.email?esc(c.email)+' \u00b7 ':''}${n} sessie${n===1?'':'s'}${hasPers?' \u00b7 \u{1F464} persoonlijke info':''}${c.labbook_url?' \u00b7 \u{1F4D3} labboek':''}</div></div>
           </div>
           <button class="star ${c.favorite?'on':''}" onclick="event.stopPropagation();toggleFav('coachees','${c.id}',this)">${c.favorite?'\u2605':'\u2606'}</button>
-          ${delChipHTML(`delCoachee('${c.id}',this)`)}
+          ${cardMenuHTML(menuId,menuItems)}
           <span class="pill note">coachee</span>
           <span class="card-caret">\u25B6</span>
         </div>
@@ -2616,7 +2939,6 @@
             <button class="act" onclick="openCoDetail('${c.id}')">${mi(COL.coach,ICO.user)}Persoonlijke info</button>
             <button class="act" onclick="openCoLab('${c.id}')">${mi(COL.book,ICO.eye)}Labboek${c.labbook_url?' \u2713':''}</button>
             <button class="act" onclick="openCoMeeting('${c.id}','${first}')">${mi(COL.coach,ICO.calendar)}Plan meeting</button>
-            <button class="act" onclick="editCoachee('${c.id}')">${mi(COL.neutral,ICO.pencil)}Wijzig</button>
           </div>
         </div>
         <div class="card-actions" onclick="event.stopPropagation()">
@@ -2624,7 +2946,7 @@
           <button class="act" onclick="askAboutCoachee('${c.id}','${escJs(c.name)}')">${mi(COL.dain,ICO.chat)}Vraag Dain over ${first}</button>
         </div>
       </article>`;
-    }).join('');
+    }).join(''));
   }
 
   function openCoDetail(id){
@@ -3077,7 +3399,7 @@
     } else if(b.source_notes){
       body+=`<div class="section-label"><span>Jouw aantekeningen</span></div><div class="text-block">${linkifyWiki(b.source_notes)}</div>`;
     }
-    body+=`<div class="section-label"><span>Mijn belangrijkste inzichten</span></div>
+    body+=`<div class="section-label"><span>Mijn belangrijkste inzichten</span> <button class="act" style="padding:3px 10px;font-size:11.5px;margin-left:6px;text-transform:none;letter-spacing:normal;" onclick="event.stopPropagation();improveBookInsights('${b.id}',this)">${mi(COL.dain,ICO.sparkle)}Verbeter tekst</button> <span id="bundo-${b.id}"></span></div>
       <div class="bk-insights">
         <textarea id="bkins-${b.id}" placeholder="Wat deed dit boek met jou? Welke inzichten neem je mee?\u2026" oninput="scheduleBookInsight('${b.id}',this)">${esc(b.my_insights||'')}</textarea>
         <span class="save-status" id="bkstat-${b.id}"></span>
@@ -3085,7 +3407,7 @@
     const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions().replace(/value="([^"]+)"/g,(m,id)=>id===b.notebook_id?`value="${id}" selected`:m);
     const nbPick=`<select onchange="setBookNotebook('${b.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select>`;
     const bkPick=bucketChipHTML(bucketIds,bookBuckets,`openBookBucketPicker('${b.id}')`);
-    body+=`<div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${nbPick} ${bkPick}</div>`;
+    body+=`<div id="blinks-${b.id}" class="hidden"><div class="section-label"><span>Koppelingen</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${nbPick} ${bkPick}</div></div>`;
     return body;
   }
   async function openBookBucketPicker(id){
@@ -3109,7 +3431,7 @@
     conn.textContent=`\u25CF ${count??books.length} boek${(count??books.length)===1?'':'en'}`;
     if(!books.length){ $('bkCards').innerHTML=`<div class="empty"><div class="big">Nog geen boeken</div><p>Voeg hierboven je eerste boek toe.</p></div>`; return; }
     const bkByBook=await loadBucketLinksFor('book_bucket_links','book_id',books.map(b=>b.id));
-    $('bkCards').innerHTML=books.map(b=>bookCardHTML(b,bkByBook[b.id])).join('')+loadMoreHTML('bookLimit+=50;loadBooks()',books.length,count);
+    setCardsHTMLPreserveOpen($('bkCards'),books.map(b=>bookCardHTML(b,bkByBook[b.id])).join('')+loadMoreHTML('bookLimit+=50;loadBooks()',books.length,count));
   }
 
   $('bkCreateBtn').addEventListener('click',async()=>{
@@ -3192,16 +3514,21 @@
     let body='';
     if(d.ai_summary) body+=`<div class="section-label"><span>Samenvatting van Dain</span></div><div class="text-block">${linkifyWiki(d.ai_summary)}</div>`;
     if(d.key_points) body+=`<div class="section-label"><span>Kernpunten</span></div><div class="text-block">${linkifyWiki(d.key_points)}</div>`;
-    body+=`<div class="section-label"><span>Mijn notities</span></div>
+    body+=`<div class="section-label"><span>Mijn notities</span> <button class="act" style="padding:3px 10px;font-size:11.5px;margin-left:6px;text-transform:none;letter-spacing:normal;" onclick="event.stopPropagation();improveDocNotes('${d.id}',this)">${mi(COL.dain,ICO.sparkle)}Verbeter tekst</button> <span id="dundo-${d.id}"></span></div>
       <div class="bk-insights"><textarea id="docnote-${d.id}" placeholder="Jouw eigen aantekeningen bij dit document\u2026" oninput="scheduleDocNote('${d.id}',this)">${esc(d.my_notes||'')}</textarea><span class="save-status" id="docstat-${d.id}"></span></div>`;
     const nbOpts=`<option value="">\u2014 notitieboek \u2014</option>`+notebookOptions(d.notebook_id);
-    body+=`<div class="section-label"><span>Notitieboek</span></div><div><select onchange="setDocNotebook('${d.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select></div>`;
-    return `<article class="card collapsible" onclick="toggleCard(this)">
+    body+=`<div id="dlinks-${d.id}" class="hidden"><div class="section-label"><span>Notitieboek</span></div><div><select onchange="setDocNotebook('${d.id}',this.value)" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;color:var(--ink-soft);background:#fff;">${nbOpts}</select></div></div>`;
+    const menuId=`dmenu-${d.id}`;
+    const menuItems=`
+      <button class="act" onclick="toggleInlineSection('dlinks-${d.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Koppelen</button>
+      <button class="act" onclick="shareItem('document','${d.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
+      <button class="act danger" onclick="deleteDocument('${d.id}',this)">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
+    return `<article class="card collapsible" id="doc-${d.id}" onclick="toggleCard(this)">
       <div class="card-head">
         <span class="mi" style="background:${meta.grad};width:34px;height:34px;border-radius:9px;flex-shrink:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;">${meta.shape}</svg></span>
         <div style="flex:1;min-width:0;"><div class="card-title">${esc(d.title||d.file_name)}</div><div class="card-meta">${when} \u00b7 ${meta.label}${nb?' \u00b7 '+esc(nb.name):''}</div></div>
         ${starHTML('documents',d.id,d.favorite)}
-        ${delChipHTML(`deleteDocument('${d.id}',this)`)}
+        ${cardMenuHTML(menuId,menuItems)}
         ${docStatusPill(d.status)}
       </div>
       <div class="card-body" onclick="event.stopPropagation()">${body}</div>
@@ -3217,7 +3544,7 @@
     if(error){ $('docCards').innerHTML=`<div class="empty"><div class="big">Kon niet laden</div><p>${esc(error.message)}</p></div>`; return; }
     conn.textContent=`\u25CF ${count??docs.length} document${(count??docs.length)===1?'':'en'}`;
     if(!docs.length){ $('docCards').innerHTML=`<div class="empty"><div class="big">Nog geen documenten</div><p>Upload hierboven je eerste PDF, Word- of PowerPoint-bestand.</p></div>`; return; }
-    $('docCards').innerHTML=docs.map(docCardHTML).join('')+loadMoreHTML('docLimit+=50;loadDocuments()',docs.length,count);
+    setCardsHTMLPreserveOpen($('docCards'),docs.map(docCardHTML).join('')+loadMoreHTML('docLimit+=50;loadDocuments()',docs.length,count));
   }
   function openDocUploadPopup(){
     const nbOpts=`<option value="">Geen notitieboek</option>`+notebookOptions(activeNB!=='all'?activeNB:null);
@@ -3336,7 +3663,7 @@
 
   // ================= DASHBOARD =================
   const DASH_BLOCKS=[
-    {id:'hello',   name:'Welkom',            wide:false},
+    {id:'scratch', name:'Kladblok',           wide:true},
     {id:'today',   name:'Vandaag',            wide:false},
     {id:'stats',   name:'Statistieken',      wide:false},
     {id:'actions', name:'Openstaande acties', wide:false},
@@ -3349,6 +3676,10 @@
   let dashConfig=JSON.parse(localStorage.getItem('dashConfig')||'null');
   if(!dashConfig){ dashConfig={ order:DASH_BLOCKS.map(b=>b.id), hidden:[], sizes:{} }; }
   if(!dashConfig.sizes) dashConfig.sizes={}; // bestaande gebruikers die dit nog niet hadden
+  // Het 'hello'-welkomstblok bestaat niet meer als los blok \u2014 die boodschap staat nu bovenaan de pagina.
+  // Bestaande, eerder opgeslagen volgorde/verborgen-lijst hiervan opschonen zodat er geen leeg vakje overblijft.
+  dashConfig.order=(dashConfig.order||[]).filter(id=>id!=='hello');
+  dashConfig.hidden=(dashConfig.hidden||[]).filter(id=>id!=='hello');
   DASH_BLOCKS.forEach(b=>{ if(!dashConfig.order.includes(b.id)) dashConfig.order.push(b.id); }); // nieuwe blokken automatisch toevoegen voor bestaande gebruikers
   function saveDash(){ localStorage.setItem('dashConfig',JSON.stringify(dashConfig)); }
   function blockSize(id){
@@ -3394,7 +3725,7 @@
   // Let op: audiobestanden zelf (in de 'Recordings' storage-bucket) zitten niet in deze JSON-export \u2014
   // dat is losse binaire data. Deze backup dekt al je tekst: transcripten, samenvattingen, notities, etc.
   let dashEdit=false;
-  let dashData={ recs:[], notes:[], actions:[], counts:{} };
+  let dashData={ recs:[], notes:[], actions:[], counts:{}, scratchpad:'' };
 
   function toggleDashEdit(){
     dashEdit=!dashEdit;
@@ -3423,7 +3754,11 @@
 
   async function loadDashboard(){
     const greet=greeting();
+    if($('dashHint')) $('dashHint').textContent=`${greet}, Daan \u{1F44B} \u2014 dit is wat er speelt in je tweede brein.`;
     conn.textContent='\u25CF dashboard';
+    const { data:{ user } }=await sb.auth.getUser();
+    const { data:scratch }=await sb.from('scratchpad').select('content').eq('user_id',user.id).maybeSingle();
+    dashData.scratchpad=scratch?.content||'';
     // Data parallel ophalen
     const [recsR, notesR, actR, coachR, bookR, mapR]=await Promise.all([
       sb.from('recordings').select('id,title,status,created_at').neq('status','deleted').order('created_at',{ascending:false}).limit(5),
@@ -3501,6 +3836,39 @@
     if(h<18) return 'Goedemiddag';
     return 'Goedenavond';
   }
+  // ---- Kladblok: puur voor snelle losse aantekeningen, bewust NIET meegenomen in Dain's analyse (geen embedContent-aanroep) ----
+  let scratchTimer=null;
+  function scheduleScratchpadSave(ta){
+    dashData.scratchpad=ta.value;
+    const st=$('scratchStat'); if(st){ st.className='save-status saving'; st.textContent='Opslaan\u2026'; }
+    clearTimeout(scratchTimer);
+    scratchTimer=setTimeout(async()=>{
+      const { data:{ user } }=await sb.auth.getUser();
+      const { error }=await sb.from('scratchpad').upsert({ user_id:user.id, content:ta.value, updated_at:new Date().toISOString() });
+      const st2=$('scratchStat'); if(st2){ st2.className='save-status saved'; st2.textContent=error?'':'Opgeslagen \u2713'; }
+    },700);
+  }
+  async function convertScratchpadToNote(btn){
+    const ta=$('scratchpadText');
+    const txt=(ta?.value||'').trim();
+    if(!txt){ toast('Je kladblok is nog leeg.'); return; }
+    if(btn) btn.disabled=true;
+    try{
+      const { data:{ user } }=await sb.auth.getUser();
+      const { data:note, error }=await sb.from('notes').insert({ user_id:user.id, title:null, content:txt }).select().single();
+      if(error||!note) throw new Error(error?.message||'onbekende fout');
+      embedContent('notes',note.id);
+      if(txt.length>15){ sb.functions.invoke('generate-title',{ body:{ text:txt } }).then(({data})=>{ if(data?.title) sb.from('notes').update({ title:data.title }).eq('id',note.id); }).catch(()=>{}); }
+      await sb.from('scratchpad').upsert({ user_id:user.id, content:'', updated_at:new Date().toISOString() });
+      dashData.scratchpad='';
+      if(ta) ta.value='';
+      const st=$('scratchStat'); if(st){ st.className='save-status saved'; st.textContent='Omgezet naar notitie \u2713'; }
+      toast('Kladblok omgezet naar een notitie \u2014 het kladblok is weer leeg.');
+    }catch(e){
+      toast('Omzetten mislukt: '+e.message);
+    }
+    if(btn) btn.disabled=false;
+  }
 
   function renderDash(){
     const grid=$('dashGrid');
@@ -3514,8 +3882,10 @@
     const wide=blockSize(id)==='full'?' wide':'';
     const editCls=dashEdit?' editing':'';
     let inner='';
-    if(id==='hello'){
-      inner=`<div class="db-hello"><h2>${dashData.greet||'Welkom'}, Daan \u{1F44B}</h2><p>Dit is wat er speelt in je tweede brein.</p></div>`;
+    if(id==='scratch'){
+      inner=`<div class="db-title">Kladblok <button class="act" style="float:right;padding:2px 9px;font-size:11.5px;text-transform:none;letter-spacing:normal;" onclick="convertScratchpadToNote(this)">${mi(COL.note,ICO.plus)}Omzetten naar notitie</button></div>
+        <textarea id="scratchpadText" placeholder="Snel iets opschrijven\u2026 dit blijft puur voor jezelf en wordt niet meegenomen in Dain's analyse." oninput="scheduleScratchpadSave(this)" style="width:100%;min-height:110px;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;font-family:inherit;font-size:14px;color:var(--ink);resize:vertical;">${esc(dashData.scratchpad||'')}</textarea>
+        <span class="save-status" id="scratchStat"></span>`;
     }
     else if(id==='today'){
       const appts=dashData.today||[];
@@ -4439,7 +4809,7 @@
       }
       let bodyInner='';
       if(i.title) bodyInner+=`<div class="ic-title">${esc(i.title)}</div>`;
-      if(i.content) bodyInner+=`<div class="ic-note">${esc(i.content)}</div>`;
+      if(i.content) bodyInner+=`<div class="ic-note">${linkifyUrls(i.content)}</div>`;
       if(i.url && i.kind!=='video') bodyInner+=`<a class="ic-link" href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.url)}</a>`;
       (bkByInsp[i.id]||[]).forEach(bid=>{
         const bk=inspBuckets.find(x=>x.id===bid);
@@ -4447,13 +4817,17 @@
       });
       bodyInner+=attachmentsBlockHTML(attByInsp[i.id]);
       const bodyBlock=bodyInner?`<div class="ic-body">${bodyInner}</div>`:'';
+      const menuId=`imenu-${i.id}`;
+      const menuItems=`
+        <button class="act" onclick="pickAttachment('inspiration','${i.id}');toggleMenu('${menuId}')">${mi(COL.note,ICO.clip)}Bijlage</button>
+        <button class="act" onclick="openInspBucketPicker('${i.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.link)}Buckets</button>
+        <button class="act" onclick="editInsp('${i.id}');toggleMenu('${menuId}')">${mi(COL.neutral,ICO.pencil)}Bewerken</button>
+        <button class="act" onclick="shareItem('inspiration','${i.id}');toggleMenu('${menuId}')">${mi(COL.green,ICO.download)}Download &amp; delen</button>
+        <button class="act danger" onclick="delInsp('${i.id}','${i.image_path||''}')">${mi(COL.danger,ICO.trash)}Verwijderen</button>`;
       return `<div class="insp-card">
         <div class="ic-tools">
           <button class="${i.favorite?'fav-on':''}" title="Favoriet" onclick="toggleInspFav('${i.id}',this)">${i.favorite?'\u2605':'\u2606'}</button>
-          <button title="Bijlage toevoegen" onclick="pickAttachment('inspiration','${i.id}')">\u{1F4CE}</button>
-          <button title="Buckets" onclick="openInspBucketPicker('${i.id}')">\u{1F5C2}</button>
-          <button title="Bewerken" onclick="editInsp('${i.id}')">\u270E</button>
-          <button title="Verwijderen" onclick="delInsp('${i.id}','${i.image_path||''}')">\u{1F5D1}</button>
+          ${cardMenuHTML(menuId,menuItems)}
         </div>
         ${media}${bodyBlock}
       </div>`;
@@ -4623,7 +4997,7 @@
     const { data:notes, count }=await q;
     const attByNote=await loadAttachmentsFor('note',(notes||[]).map(n=>n.id));
     const bkByNote=await loadBucketLinksFor('note_bucket_links','note_id',(notes||[]).map(n=>n.id));
-    fn.innerHTML=(notes||[]).map(n=>noteCardHTML(n,attByNote[n.id],bkByNote[n.id])).join('')+loadMoreHTML('noteLimit+=50;loadNoteFeed()',(notes||[]).length,count);
+    setCardsHTMLPreserveOpen(fn,(notes||[]).map(n=>noteCardHTML(n,attByNote[n.id],bkByNote[n.id])).join('')+loadMoreHTML('noteLimit+=50;loadNoteFeed()',(notes||[]).length,count));
     initPendingPdfViewers();
   }
   async function openNoteBucketPicker(id){
