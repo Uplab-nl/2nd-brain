@@ -4081,7 +4081,7 @@
   // Let op: audiobestanden zelf (in de 'Recordings' storage-bucket) zitten niet in deze JSON-export \u2014
   // dat is losse binaire data. Deze backup dekt al je tekst: transcripten, samenvattingen, notities, etc.
   let dashEdit=false;
-  let dashData={ recs:[], notes:[], actions:[], counts:{}, scratchpad:'' };
+  let dashData={ recs:[], notes:[], actions:[], counts:{}, scratchpad:'', briefingMessage:null, briefingLoading:false };
 
   function toggleDashEdit(){
     dashEdit=!dashEdit;
@@ -4183,6 +4183,7 @@
       } else dashData.spark=null;
     }catch(e){ dashData.spark=null; }
     renderDash();
+    loadDailyBriefing();
   }
 
   function greeting(){
@@ -4226,6 +4227,21 @@
     if(btn) btn.disabled=false;
   }
 
+  // ---- Ochtendbriefing: agenda + Strato-mail + open acties, samengevat door Dain ----
+  async function loadDailyBriefing(force){
+    if(dashData.briefingMessage && !force) return;
+    dashData.briefingLoading=true;
+    const el=$('briefingMsg'); if(el) el.innerHTML='<span style="color:var(--ink-faint);font-style:italic;">Dain kijkt naar je agenda, mail en acties\u2026</span>';
+    try{
+      const { data, error }=await sb.functions.invoke('daily-briefing',{ body:{} });
+      if(error||data?.error) throw new Error(data?.error||error.message);
+      dashData.briefingMessage=data.message;
+    }catch(e){
+      dashData.briefingMessage='Kon geen briefing samenstellen: '+e.message;
+    }
+    dashData.briefingLoading=false;
+    const el2=$('briefingMsg'); if(el2) el2.innerHTML=esc(dashData.briefingMessage).replace(/\n/g,'<br>');
+  }
   function autosizeTA(el){
     if(!el) return;
     el.style.height='auto';
@@ -4252,14 +4268,26 @@
     else if(id==='today'){
       const appts=dashData.today||[];
       const fmt=d=>new Date(d).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
-      const rows=appts.length?appts.map(a=>`
+      const apptRows=appts.length?appts.map(a=>`
         <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.05);">
           <div style="font-weight:700;font-size:13px;min-width:44px;color:#549E39;">${fmt(a.start_time)}</div>
           <div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.title||'Afspraak')}</div>${a.coachee_name?`<div style="font-size:12px;color:var(--ink-soft);">\u{1F464} ${esc(a.coachee_name)}</div>`:''}</div>
           ${a.meet_link?`<a class="act" href="${esc(a.meet_link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;">\u{1F4F9}</a>`:''}
           ${a.coachee_id?`<button class="act" title="Laat Dain je voorbereiden" onclick="prepSession('${a.coachee_id}','${escJs(a.coachee_name||'')}')">\u{1F4CB} Prep</button>`:''}
         </div>`).join(''):'<div class="db-empty">Geen afspraken vandaag \u2014 ruimte om te denken \u{1F9D8}</div>';
-      inner=`<div class="db-title">Vandaag</div>${rows}`;
+      const openToday=sortActions(dashData.actions).filter(a=>!a.done);
+      const shownToday=openToday.slice(0,4), restToday=openToday.slice(4);
+      let actionRows=shownToday.length?shownToday.map(a=>actionRowHTML(a)).join(''):'<div class="db-empty">Geen open actiepunten \u2014 lekker bezig \u2728</div>';
+      if(restToday.length) actionRows+=`<div class="section-label transcript-toggle" onclick="toggleDashFold('todayMoreActions')" style="cursor:pointer;margin-top:6px;"><span>+${restToday.length} meer <span id="todayMoreActionsCaret">\u25B8</span></span></div><div id="todayMoreActionsBox" class="hidden">${restToday.map(a=>actionRowHTML(a)).join('')}</div>`;
+      const briefingHtml = dashData.briefingMessage
+        ? esc(dashData.briefingMessage).replace(/\n/g,'<br>')
+        : '<span style="color:var(--ink-faint);font-style:italic;">Dain kijkt naar je agenda, mail en acties\u2026</span>';
+      inner=`<div class="db-title" style="display:flex;align-items:center;justify-content:space-between;"><span>Vandaag</span><button class="act" style="padding:3px 10px;font-size:11.5px;" onclick="loadDailyBriefing(true)" title="Briefing vernieuwen">${mi(COL.dain,ICO.sparkle)}</button></div>
+        <div id="briefingMsg" style="font-size:14px;color:var(--ink);line-height:1.6;margin-bottom:16px;">${briefingHtml}</div>
+        <div class="section-label"><span>Agenda</span></div>
+        ${apptRows}
+        <div class="section-label" style="margin-top:14px;"><span>Open acties</span></div>
+        ${actionRows}`;
     }
     else if(id==='spark'){
       const sp=dashData.spark;
