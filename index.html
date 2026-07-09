@@ -226,6 +226,9 @@
     .dash-grid{ grid-template-columns:1fr; }
     .note-composer .nc-foot > select, .note-composer .nc-foot > div { width:100%; }
     .note-composer .nc-foot > div { justify-content:space-between; }
+    .card-head .pill, .card-head .card-caret { display:none; }
+    #nbViewSeg { display:none; }
+    .nb-view-mobile { display:inline-block; }
   }
   .feed { padding-bottom:80px; display:flex; flex-direction:column; gap:10px; }
   .card { background:var(--card); border-radius:16px; box-shadow:var(--shadow-sm); border:1.5px solid var(--line); transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
@@ -414,6 +417,8 @@
   /* ===== v11 toevoegingen ===== */
   .block-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
   .block-toolbar .seg { display:flex; gap:4px; background:var(--card); padding:4px; border-radius:12px; box-shadow:var(--shadow-sm); }
+  .nb-view-mobile { display:none; }
+  .dropdown-menu button.act.on { color:var(--purple); border-color:var(--purple); }
   .seg button { border:none; background:none; font-family:inherit; font-size:13px; font-weight:500; color:var(--ink-soft); padding:7px 14px; border-radius:9px; cursor:pointer; transition:all .12s; }
   .seg button.on { background:var(--grad-purple); color:#fff; }
   .star { cursor:pointer; font-size:18px; line-height:1; color:var(--ink-faint); transition:transform .1s,color .12s; background:none; border:none; padding:0 2px; }
@@ -579,6 +584,7 @@
           <button class="menu-btn" onclick="toggleMenu('dashMenu')" title="Meer opties">&#9776;</button>
           <div class="dropdown-menu hidden" id="dashMenu">
             <button class="act" id="googleConnBtn" onclick="connectGoogleCalendar()" title="Koppel je Google Agenda zodat afspraken automatisch met Meet-link worden aangemaakt"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128197;</span><span class="lbl">Google Agenda koppelen</span></button>
+            <button class="act" id="mailConnBtn" onclick="toggleMenu('dashMenu');openMailConnect()" title="Koppel Gmail en/of een IMAP-postbus (bijv. Strato)"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128233;</span><span class="lbl">Mail koppelen</span></button>
             <button class="act" id="backupBtn" onclick="exportBackup(this)" title="Download al je data als JSON-bestand"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span><span class="lbl">Backup downloaden</span></button>
             <button class="act" id="dashEditBtn" onclick="toggleDashEdit()"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="lbl">Blokken aanpassen</span></button>
           </div>
@@ -794,11 +800,12 @@
   // ================= GOOGLE AGENDA-KOPPELING =================
   const GOOGLE_CLIENT_ID='945460576637-lnf92190ih75qt305dhdaaeagq08c39e.apps.googleusercontent.com';
   const GOOGLE_REDIRECT_URI='https://uplab-nl.github.io/2nd-brain/';
-  let googleConnected=false;
+  let googleConnected=false, gmailConnected=false;
   function connectGoogleCalendar(){
     const params=new URLSearchParams({
       client_id:GOOGLE_CLIENT_ID, redirect_uri:GOOGLE_REDIRECT_URI, response_type:'code',
-      scope:'https://www.googleapis.com/auth/calendar.events', access_type:'offline', prompt:'consent',
+      scope:'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.readonly',
+      access_type:'offline', prompt:'consent', include_granted_scopes:'true',
     });
     window.location.href='https://accounts.google.com/o/oauth2/v2/auth?'+params.toString();
   }
@@ -806,7 +813,8 @@
     try{
       const { data, error }=await sb.functions.invoke('google-status',{ body:{} });
       googleConnected=!error && !data?.error && !!data?.connected;
-    }catch(_e){ googleConnected=false; }
+      gmailConnected=!error && !data?.error && !!data?.gmail_connected;
+    }catch(_e){ googleConnected=false; gmailConnected=false; }
     const el=$('googleConnBtn'); if(!el) return;
     el.innerHTML=googleConnected
       ?'<span class="mi" style="background:linear-gradient(135deg,#3dd6b0,#5a9cff)">\u2713</span><span class="lbl">Google Agenda gekoppeld</span>'
@@ -822,10 +830,84 @@
       const { data, error }=await sb.functions.invoke('google-oauth-callback',{ body:{ code, redirect_uri:GOOGLE_REDIRECT_URI } });
       if(error||data?.error) throw new Error(data?.error||error.message);
       await refreshGoogleStatusUI();
-      toast('Google Agenda gekoppeld. Afspraken kunnen er nu automatisch in.');
+      toast(data?.gmail_connected?'Google gekoppeld — agenda én mail zijn nu leesbaar.':'Google Agenda gekoppeld. Afspraken kunnen er nu automatisch in.');
     }catch(e){
       toast('Koppelen mislukt: '+e.message);
     }
+  }
+  // ================= MAIL KOPPELEN (Gmail + IMAP, bijv. Strato) =================
+  async function openMailConnect(){
+    const body=`
+      <p style="color:var(--ink-soft);font-size:14px;margin-bottom:6px;">Koppel de postbussen waar Dain straks je ochtendbriefing mee kan verrijken. Gmail via een beveiligde koppeling, andere providers (zoals Strato) via IMAP met e-mail + wachtwoord.</p>
+      <div id="mcGmailRow" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 0;border-bottom:1px solid var(--line);">
+        <div><div style="font-weight:600;font-size:14px;">Gmail</div><div id="mcGmailStatus" style="font-size:12.5px;color:var(--ink-faint);">Status laden\u2026</div></div>
+        <button class="act primary" id="mcGmailBtn" onclick="connectGoogleCalendar()">Koppelen</button>
+      </div>
+      <div style="padding:14px 0 4px;">
+        <div style="font-weight:600;font-size:14px;margin-bottom:8px;">IMAP-postbussen <span style="font-weight:400;color:var(--ink-faint);">(bijv. Strato-webmail)</span></div>
+        <div id="mcImapList" style="margin-bottom:12px;"><span style="font-size:12.5px;color:var(--ink-faint);">Laden\u2026</span></div>
+        <button class="act" id="mcImapAddBtn" onclick="openImapAddForm()">+ IMAP-postbus toevoegen</button>
+      </div>
+      <div class="sheet-actions"><button class="act" id="mcClose">Sluiten</button></div>`;
+    openSheet('\u{1F4EC} Mail koppelen', body, (ov,close)=>{
+      $('mcClose').onclick=close;
+      loadMailStatus();
+    });
+  }
+  async function loadMailStatus(){
+    const gs=$('mcGmailStatus'), gb=$('mcGmailBtn');
+    try{
+      const { data, error }=await sb.functions.invoke('mail-status',{ body:{} });
+      if(error||data?.error) throw new Error(data?.error||error.message);
+      if(gs) gs.textContent = data.gmail_connected
+        ? 'Verbonden \u2713 \u2014 agenda \u00e9n mail leesbaar'
+        : (data.google_connected ? 'Agenda gekoppeld, mail nog niet \u2014 koppel opnieuw voor mailtoegang' : 'Niet gekoppeld');
+      if(gb) gb.textContent = data.gmail_connected ? 'Opnieuw koppelen' : 'Koppelen';
+      renderImapList(data.imap_accounts||[]);
+    }catch(e){
+      if(gs) gs.textContent='Kon status niet laden: '+e.message;
+      renderImapList([]);
+    }
+  }
+  function renderImapList(accounts){
+    const el=$('mcImapList'); if(!el) return;
+    if(!accounts.length){ el.innerHTML='<span style="font-size:12.5px;color:var(--ink-faint);">Nog geen IMAP-postbus gekoppeld.</span>'; return; }
+    el.innerHTML=accounts.map(a=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);">
+        <div style="min-width:0;"><div style="font-weight:500;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.label||a.email)}</div><div style="font-size:11.5px;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.email)} \u00b7 ${esc(a.imap_host||'')}${a.last_error?' \u00b7 \u26A0\uFE0F '+esc(a.last_error):''}</div></div>
+        <button class="del-chip" onclick="removeImapAccount('${a.id}')" title="Ontkoppelen">${ICO.x}</button>
+      </div>`).join('');
+  }
+  function openImapAddForm(){
+    const body=`
+      <label>E-mailadres</label><input type="text" id="imEmail" placeholder="jij@voorbeeld.nl">
+      <label>Wachtwoord</label><input type="password" id="imPass" placeholder="Het liefst een apart, sterk wachtwoord">
+      <label>IMAP-server</label><input type="text" id="imHost" value="imap.strato.de">
+      <label>Poort</label><input type="text" id="imPort" value="993">
+      <label>Label (optioneel)</label><input type="text" id="imLabel" placeholder="Bijv. Werkmail Strato">
+      <div class="sheet-actions"><button class="act" id="imCancel">Annuleren</button><button class="act primary" id="imSave">Verbinden</button></div>
+      <div id="imStatus" style="margin-top:10px;font-size:13px;color:var(--purple);min-height:16px;"></div>`;
+    openSheet('\u{1F4E5} IMAP-postbus koppelen', body, (ov,close)=>{
+      $('imCancel').onclick=close;
+      $('imSave').onclick=async()=>{
+        const email=$('imEmail').value.trim(), password=$('imPass').value;
+        const host=$('imHost').value.trim()||'imap.strato.de', port=$('imPort').value.trim()||'993';
+        const label=$('imLabel').value.trim();
+        const status=$('imStatus'), btn=$('imSave');
+        if(!email||!password){ status.textContent='Vul e-mail en wachtwoord in.'; return; }
+        status.textContent='Verbinden\u2026'; btn.disabled=true;
+        const { data, error }=await sb.functions.invoke('imap-connect',{ body:{ email, password, host, port, label } });
+        if(error||data?.error){ status.textContent='Mislukt: '+(data?.error||error.message); btn.disabled=false; return; }
+        status.textContent='Verbonden \u2713';
+        setTimeout(()=>{ close(); loadMailStatus(); },700);
+      };
+    });
+  }
+  async function removeImapAccount(id){
+    if(!confirm('Deze IMAP-postbus ontkoppelen?')) return;
+    const { data, error }=await sb.functions.invoke('imap-disconnect',{ body:{ id } });
+    if(error||data?.error){ toast('Ontkoppelen mislukt: '+(data?.error||error.message)); return; }
+    loadMailStatus();
   }
   if('serviceWorker' in navigator){
     window.addEventListener('load',()=>{ navigator.serviceWorker.register('service-worker.js').catch(()=>{}); });
@@ -1081,7 +1163,12 @@
     if(error){ loginErr.textContent='Inloggen mislukt: controleer je e-mail en wachtwoord.'; loginBtn.disabled=false; loginBtn.textContent='Inloggen'; return; }
     showApp();
   }
-  async function showApp(){ loginScreen.classList.add('hidden'); app.classList.remove('hidden'); await loadNotebooks(); await loadCoacheeList(); await loadTemplateList(); await loadRecBuckets(); await loadNoteBuckets(); await loadBookBuckets(); await loadNotesIndex(); await loadBuckets(); switchTab('dash'); handleShareTarget(); refreshGoogleStatusUI(); handleGoogleOAuthCallback(); }
+  async function showApp(){
+    loginScreen.classList.add('hidden'); app.classList.remove('hidden');
+    if($('dashHint')) $('dashHint').textContent=`${greeting()}, Daan \u{1F44B} \u2014 dit is wat er speelt in je tweede brein.`;
+    await Promise.all([loadNotebooks(), loadCoacheeList(), loadTemplateList(), loadRecBuckets(), loadNoteBuckets(), loadBookBuckets(), loadNotesIndex(), loadBuckets()]);
+    switchTab('dash'); handleShareTarget(); refreshGoogleStatusUI(); handleGoogleOAuthCallback();
+  }
   async function doLogout(){ await sb.auth.signOut(); app.classList.add('hidden'); loginScreen.classList.remove('hidden'); loginBtn.disabled=false; loginBtn.textContent='Inloggen'; $('password').value=''; }
   loginBtn.addEventListener('click',doLogin);
   $('password').addEventListener('keydown',e=>{ if(e.key==='Enter')doLogin(); });
@@ -1201,7 +1288,14 @@
     renderNBView(id);
   }
   let nbView='all';
-  function setNBView(v){ nbView=v; document.querySelectorAll('#nbViewSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); renderNBBody(); }
+  const NB_VIEW_LABELS={all:'Alles',note:'Notities',rec:'Opnames',map:'Mindmaps',book:'Boeken',doc:'Documenten',insp:'Inspiratie'};
+  function setNBView(v){
+    nbView=v;
+    document.querySelectorAll('#nbViewSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+    document.querySelectorAll('#nbViewMenu button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+    const lbl=$('nbViewMenuLabel'); if(lbl) lbl.textContent=NB_VIEW_LABELS[v]||'Alles';
+    renderNBBody();
+  }
   function renderNBView(id){
     const nb=nbById(id); if(!nb) return;
     nbView='all';
@@ -1216,6 +1310,18 @@
         <button data-v="book" onclick="setNBView('book')">Boeken</button>
         <button data-v="doc" onclick="setNBView('doc')">Documenten</button>
         <button data-v="insp" onclick="setNBView('insp')">Inspiratie</button>
+        </div>
+        <div class="menu-wrap nb-view-mobile">
+          <button class="act" onclick="toggleMenu('nbViewMenu')">${ICO.hamburger} <span id="nbViewMenuLabel" style="margin-left:6px;">Alles</span></button>
+          <div class="dropdown-menu hidden" id="nbViewMenu">
+            <button class="act" data-v="all" onclick="setNBView('all');toggleMenu('nbViewMenu')">Alles</button>
+            <button class="act" data-v="note" onclick="setNBView('note');toggleMenu('nbViewMenu')">Notities</button>
+            <button class="act" data-v="rec" onclick="setNBView('rec');toggleMenu('nbViewMenu')">Opnames</button>
+            <button class="act" data-v="map" onclick="setNBView('map');toggleMenu('nbViewMenu')">Mindmaps</button>
+            <button class="act" data-v="book" onclick="setNBView('book');toggleMenu('nbViewMenu')">Boeken</button>
+            <button class="act" data-v="doc" onclick="setNBView('doc');toggleMenu('nbViewMenu')">Documenten</button>
+            <button class="act" data-v="insp" onclick="setNBView('insp');toggleMenu('nbViewMenu')">Inspiratie</button>
+          </div>
         </div>
         <div class="menu-wrap">
           <button class="act primary" onclick="toggleMenu('nbCreateMenu')">+ Nieuw in dit notitieboek</button>
