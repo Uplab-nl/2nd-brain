@@ -31,6 +31,7 @@
     --shadow-lg:0 12px 32px rgba(44,44,58,.12);
   }
   * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { overflow-x:hidden; width:100%; }
   body { background:var(--bg); color:var(--ink); font-family:'Roboto',-apple-system,system-ui,sans-serif; line-height:1.6; -webkit-font-smoothing:antialiased; }
   .wrap { max-width:1120px; margin:0 auto; padding:0 32px; }
   .chev { width:36px; height:34px; position:relative; flex-shrink:0; }
@@ -585,6 +586,7 @@
           <div class="dropdown-menu hidden" id="dashMenu">
             <button class="act" id="googleConnBtn" onclick="connectGoogleCalendar()" title="Koppel je Google Agenda zodat afspraken automatisch met Meet-link worden aangemaakt"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128197;</span><span class="lbl">Google Agenda koppelen</span></button>
             <button class="act" id="mailConnBtn" onclick="toggleMenu('dashMenu');openMailConnect()" title="Koppel Gmail en/of een IMAP-postbus (bijv. Strato)"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128233;</span><span class="lbl">Mail koppelen</span></button>
+            <button class="act" id="notifBtn" onclick="toggleMenu('dashMenu');openNotificationSettings()" title="Zet pushmeldingen aan op dit toestel"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128276;</span><span class="lbl">Meldingen</span></button>
             <button class="act" id="backupBtn" onclick="exportBackup(this)" title="Download al je data als JSON-bestand"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span><span class="lbl">Backup downloaden</span></button>
             <button class="act" id="dashEditBtn" onclick="toggleDashEdit()"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="lbl">Blokken aanpassen</span></button>
           </div>
@@ -799,6 +801,8 @@
   }
   // ================= GOOGLE AGENDA-KOPPELING =================
   const GOOGLE_CLIENT_ID='945460576637-lnf92190ih75qt305dhdaaeagq08c39e.apps.googleusercontent.com';
+  // Publieke VAPID-sleutel voor webpush \u2014 dit is per ontwerp niet geheim (de private key staat alleen als Supabase-secret).
+  const VAPID_PUBLIC_KEY='BDYSg_b8K5mISjMTRNPZOxIL_nb777KWnGYVMGyWPUJfbZQrTNp93OUxAOrVZ_WU5NBSKsUQH44oecyA8Qrj4uo';
   const GOOGLE_REDIRECT_URI='https://uplab-nl.github.io/2nd-brain/';
   let googleConnected=false, gmailConnected=false;
   function connectGoogleCalendar(){
@@ -835,6 +839,79 @@
       toast('Koppelen mislukt: '+e.message);
     }
   }
+  // ================= MELDINGEN (webpush, Android + iOS 16.4+ als PWA) =================
+  function isIOS(){ return /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+  function isStandalonePWA(){ return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true; }
+  function urlBase64ToUint8Array(base64String){
+    const padding='='.repeat((4 - base64String.length % 4) % 4);
+    const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+    const raw=atob(base64);
+    return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+  }
+  async function getExistingPushSub(){
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+    try{ const reg=await navigator.serviceWorker.ready; return await reg.pushManager.getSubscription(); }catch(_e){ return null; }
+  }
+  async function openNotificationSettings(){
+    const supported='PushManager' in window && 'Notification' in window && 'serviceWorker' in navigator;
+    let inner='';
+    if(!supported){
+      inner = (isIOS() && !isStandalonePWA())
+        ? `<p style="color:var(--ink-soft);font-size:14px;line-height:1.6;">Op iPhone werken meldingen alleen als Second Brain als app op je beginscherm staat. Tik in Safari op <strong>Delen \u2192 Zet op beginscherm</strong>, en open de app daarna vanaf dat icoon (niet vanuit Safari zelf).</p>`
+        : `<p style="color:var(--ink-soft);font-size:14px;line-height:1.6;">Deze browser ondersteunt geen webmeldingen. Probeer Chrome (Android) of open de app vanaf je beginscherm-icoon (iPhone, iOS 16.4+).</p>`;
+      openSheet('\u{1F514} Meldingen', inner+`<div class="sheet-actions"><button class="act primary" id="notifClose">Sluiten</button></div>`, (ov,close)=>{ $('notifClose').onclick=close; });
+      return;
+    }
+    const perm=Notification.permission;
+    const existing=await getExistingPushSub();
+    const status = perm==='denied'
+      ? 'Geblokkeerd \u2014 zet meldingen voor deze site aan via je browserinstellingen om ze hier weer te kunnen inschakelen.'
+      : existing ? 'Meldingen staan aan op dit toestel \u2713' : 'Nog niet ingeschakeld op dit toestel.';
+    const body=`
+      <p style="color:var(--ink-soft);font-size:14px;margin-bottom:6px;">Zet pushmeldingen aan zodat Dain je bijvoorbeeld kan waarschuwen als een actiepunt vandaag vervalt, of straks je ochtendbriefing kan sturen.</p>
+      <div id="notifStatus" style="font-size:13px;color:var(--ink-soft);margin:10px 0 16px;padding:10px 12px;background:var(--bg);border-radius:10px;">${esc(status)}</div>
+      <div class="sheet-actions" style="justify-content:flex-start;">
+        ${existing?`<button class="act" id="notifTestBtn">Stuur testmelding</button><button class="act danger" id="notifOffBtn">Uitzetten op dit toestel</button>`:`<button class="act primary" id="notifOnBtn" ${perm==='denied'?'disabled':''}>Meldingen aanzetten</button>`}
+      </div>
+      <div class="sheet-actions"><button class="act" id="notifClose">Sluiten</button></div>`;
+    openSheet('\u{1F514} Meldingen', body, (ov,close)=>{
+      $('notifClose').onclick=close;
+      $('notifOnBtn')?.addEventListener('click',async()=>{
+        const btn=$('notifOnBtn'); btn.disabled=true; btn.textContent='Bezig\u2026';
+        try{
+          const result=await Notification.requestPermission();
+          if(result!=='granted') throw new Error('Geen toestemming gekregen.');
+          const reg=await navigator.serviceWorker.ready;
+          const sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
+          const platform=isIOS()?'ios':(/Android/.test(navigator.userAgent)?'android':'desktop');
+          const { data, error }=await sb.functions.invoke('save-push-subscription',{ body:{ subscription:sub.toJSON(), platform } });
+          if(error||data?.error) throw new Error(data?.error||error.message);
+          toast('Meldingen staan aan \u2713');
+          close(); openNotificationSettings();
+        }catch(e){
+          toast('Kon meldingen niet inschakelen: '+e.message);
+          btn.disabled=false; btn.textContent='Meldingen aanzetten';
+        }
+      });
+      $('notifTestBtn')?.addEventListener('click',async()=>{
+        const btn=$('notifTestBtn'); btn.disabled=true; const orig=btn.textContent; btn.textContent='Versturen\u2026';
+        const { data, error }=await sb.functions.invoke('send-push',{ body:{} });
+        if(error||data?.error){ toast('Versturen mislukt: '+(data?.error||error.message)); }
+        else { toast('Testmelding verstuurd \u2014 check je scherm!'); }
+        btn.disabled=false; btn.textContent=orig;
+      });
+      $('notifOffBtn')?.addEventListener('click',async()=>{
+        const sub=await getExistingPushSub();
+        if(sub){
+          try{ await sb.functions.invoke('remove-push-subscription',{ body:{ endpoint:sub.endpoint } }); }catch(_e){}
+          await sub.unsubscribe();
+        }
+        toast('Meldingen uitgezet op dit toestel');
+        close(); openNotificationSettings();
+      });
+    });
+  }
+
   // ================= MAIL KOPPELEN (Gmail + IMAP, bijv. Strato) =================
   async function openMailConnect(){
     const body=`
@@ -1027,6 +1104,16 @@
   document.addEventListener('click',e=>{
     if(e.target.closest('.menu-wrap')) return;
     document.querySelectorAll('.dropdown-menu').forEach(m=>m.classList.add('hidden'));
+  });
+  // Op mobiel: tik ergens in het hoofdveld om het opengeklapte zijmenu te sluiten \u2014
+  // niet alleen door een keuze te maken. De hamburgerknop zelf slaat deze check over
+  // (die regelt het openen/sluiten al zelf via z'n eigen onclick).
+  document.addEventListener('click',e=>{
+    const sb=$('sidebar');
+    if(!sb || !sb.classList.contains('open')) return;
+    if(sb.contains(e.target)) return;
+    if(e.target.closest('.hamburger')) return;
+    sb.classList.remove('open');
   });
   function preview2(txt){
     if(!txt) return '';
@@ -4139,11 +4226,17 @@
     if(btn) btn.disabled=false;
   }
 
+  function autosizeTA(el){
+    if(!el) return;
+    el.style.height='auto';
+    el.style.height=(el.scrollHeight+2)+'px';
+  }
   function renderDash(){
     const grid=$('dashGrid');
     const visible=dashConfig.order.filter(id=>!dashConfig.hidden.includes(id));
     grid.innerHTML=visible.map(id=>renderBlock(id)).join('');
     if(dashEdit) attachDragHandlers();
+    autosizeTA($('scratchpadText'));
   }
 
   function renderBlock(id){
@@ -4153,7 +4246,7 @@
     let inner='';
     if(id==='scratch'){
       inner=`<div class="db-title">Kladblok <button class="act" style="float:right;padding:2px 9px;font-size:11.5px;text-transform:none;letter-spacing:normal;" onclick="convertScratchpadToNote(this)">${mi(COL.note,ICO.plus)}Omzetten naar notitie</button></div>
-        <textarea id="scratchpadText" placeholder="Snel iets opschrijven\u2026 dit blijft puur voor jezelf en wordt niet meegenomen in Dain's analyse." oninput="scheduleScratchpadSave(this)" style="width:100%;min-height:110px;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;font-family:inherit;font-size:14px;color:var(--ink);resize:vertical;">${esc(dashData.scratchpad||'')}</textarea>
+        <textarea id="scratchpadText" placeholder="Snel iets opschrijven\u2026 dit blijft puur voor jezelf en wordt niet meegenomen in Dain's analyse." oninput="scheduleScratchpadSave(this);autosizeTA(this)" style="width:100%;min-height:110px;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;font-family:inherit;font-size:14px;color:var(--ink);resize:vertical;overflow-y:auto;">${esc(dashData.scratchpad||'')}</textarea>
         <span class="save-status" id="scratchStat"></span>`;
     }
     else if(id==='today'){
