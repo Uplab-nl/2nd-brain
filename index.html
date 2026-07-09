@@ -4326,13 +4326,19 @@
     if(dashData.briefingMessage && !force) return;
     dashData.briefingLoading=true;
     const el=$('briefingMsg'); if(el) el.innerHTML='<span style="color:var(--ink-faint);font-style:italic;">Dain kijkt naar je agenda, mail en acties\u2026</span>';
-    try{
-      const { data, error }=await sb.functions.invoke('daily-briefing',{ body:{} });
-      if(error||data?.error) throw new Error(data?.error||error.message);
-      dashData.briefingMessage=data.message;
-    }catch(e){
-      dashData.briefingMessage='Kon geen briefing samenstellen: '+e.message;
+    // Soms haapert Supabase eventjes bij het opstarten van deze functie (koude start) \u2014 daarom
+    // \u00e9\u00e9n stille herhaalpoging voordat we een foutmelding tonen.
+    let lastErr=null;
+    for(let poging=0;poging<2;poging++){
+      try{
+        const { data, error }=await sb.functions.invoke('daily-briefing',{ body:{} });
+        if(error||data?.error) throw new Error(data?.error||error.message);
+        dashData.briefingMessage=data.message;
+        lastErr=null;
+        break;
+      }catch(e){ lastErr=e; if(poging===0) await new Promise(r=>setTimeout(r,1500)); }
     }
+    if(lastErr) dashData.briefingMessage='Kon geen briefing samenstellen: '+lastErr.message+' \u2014 probeer de \u2728-knop hierboven nog eens.';
     dashData.briefingLoading=false;
     const el2=$('briefingMsg'); if(el2) el2.innerHTML=esc(dashData.briefingMessage).replace(/\n/g,'<br>');
   }
@@ -4538,12 +4544,16 @@
       input.addEventListener('keydown',e=>{ if(e.key==='Enter') save(); });
     });
   }
+  let actionDueTimers={};
   async function setActionDue(id,value){
     const a=dashData.actions.find(x=>x.id===id); if(!a) return;
     a.due_date=value||null;
     const badge=$('duebadge-'+id); if(badge) badge.innerHTML=dueBadge(a.due_date);
     await sb.from('action_items').update({ due_date:a.due_date }).eq('id',id);
-    renderDash(); // her-sorteert 'Deze week vervallen' en verplaatst 'm eventueel
+    // Niet meteen her-sorteren/laten verspringen \u2014 op mobiel voelt dat als wegschieten terwijl je nog
+    // aan het kiezen bent. Pas als je een paar seconden niks meer aanpast, valt de rij op z'n plek.
+    clearTimeout(actionDueTimers[id]);
+    actionDueTimers[id]=setTimeout(()=>{ renderDash(); delete actionDueTimers[id]; },1800);
   }
 
   // Drag & drop van blokken
