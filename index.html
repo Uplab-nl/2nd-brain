@@ -588,6 +588,7 @@
           <div class="dropdown-menu hidden" id="dashMenu">
             <button class="act" id="googleConnBtn" onclick="connectGoogleCalendar()" title="Koppel je Google Agenda zodat afspraken automatisch met Meet-link worden aangemaakt"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128197;</span><span class="lbl">Google Agenda koppelen</span></button>
             <button class="act" id="mailConnBtn" onclick="toggleMenu('dashMenu');openMailConnect()" title="Koppel Gmail en/of een IMAP-postbus (bijv. Strato)"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128233;</span><span class="lbl">Mail koppelen</span></button>
+            <button class="act" id="calConnBtn" onclick="toggleMenu('dashMenu');openCalendarsConnect()" title="Koppel extra Google-agenda's, alleen om te lezen"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128197;</span><span class="lbl">Agenda's koppelen</span></button>
             <button class="act" id="notifBtn" onclick="toggleMenu('dashMenu');openNotificationSettings()" title="Zet pushmeldingen aan op dit toestel"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128276;</span><span class="lbl">Meldingen</span></button>
             <button class="act" id="backupBtn" onclick="exportBackup(this)" title="Download al je data als JSON-bestand"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span><span class="lbl">Backup downloaden</span></button>
             <button class="act" id="dashEditBtn" onclick="toggleDashEdit()"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="lbl">Blokken aanpassen</span></button>
@@ -826,13 +827,28 @@
       ?'<span class="mi" style="background:linear-gradient(135deg,#3dd6b0,#5a9cff)">\u2713</span><span class="lbl">Google Agenda gekoppeld</span>'
       :'<span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">\u{1F4C5}</span><span class="lbl">Google Agenda koppelen</span>';
   }
+  function connectReadonlyCalendar(){
+    const params=new URLSearchParams({
+      client_id:GOOGLE_CLIENT_ID, redirect_uri:GOOGLE_REDIRECT_URI, response_type:'code',
+      scope:'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email',
+      access_type:'offline', prompt:'consent', include_granted_scopes:'true', state:'readonly_cal',
+    });
+    window.location.href='https://accounts.google.com/o/oauth2/v2/auth?'+params.toString();
+  }
   async function handleGoogleOAuthCallback(){
     const url=new URL(window.location.href);
     const code=url.searchParams.get('code');
     if(!code) return;
+    const state=url.searchParams.get('state');
     url.searchParams.delete('code'); url.searchParams.delete('scope'); url.searchParams.delete('state');
     window.history.replaceState({},document.title,url.pathname+url.search);
     try{
+      if(state==='readonly_cal'){
+        const { data, error }=await sb.functions.invoke('google-readonly-callback',{ body:{ code, redirect_uri:GOOGLE_REDIRECT_URI } });
+        if(error||data?.error) throw new Error(data?.error||error.message);
+        toast('Agenda gekoppeld (alleen-lezen)'+(data?.email?': '+data.email:'')+' \u2713');
+        return;
+      }
       const { data, error }=await sb.functions.invoke('google-oauth-callback',{ body:{ code, redirect_uri:GOOGLE_REDIRECT_URI } });
       if(error||data?.error) throw new Error(data?.error||error.message);
       await refreshGoogleStatusUI();
@@ -840,6 +856,40 @@
     }catch(e){
       toast('Koppelen mislukt: '+e.message);
     }
+  }
+  // ================= EXTRA AGENDA'S (alleen lezen) =================
+  async function openCalendarsConnect(){
+    const body=`
+      <p style="color:var(--ink-soft);font-size:14px;margin-bottom:6px;">Koppel extra Google-agenda's die Dain mag meelezen voor je ochtendbriefing. Deze koppeling is puur om te lezen \u2014 er wordt nooit iets in geschreven.</p>
+      <div id="calList" style="margin:14px 0;"><span style="font-size:12.5px;color:var(--ink-faint);">Laden\u2026</span></div>
+      <button class="act primary" id="calAddBtn" onclick="connectReadonlyCalendar()">+ Agenda toevoegen (alleen lezen)</button>
+      <p style="color:var(--ink-faint);font-size:12px;margin-top:10px;">Tip: kies op het Google-scherm steeds een ander account dan de vorige keer \u2014 klik zo nodig op "een ander account gebruiken".</p>
+      <div class="sheet-actions"><button class="act" id="calClose">Sluiten</button></div>`;
+    openSheet('\u{1F4C5} Agenda\u2019s koppelen', body, (ov,close)=>{
+      $('calClose').onclick=close;
+      loadReadonlyCalendars();
+    });
+  }
+  async function loadReadonlyCalendars(){
+    const el=$('calList'); if(!el) return;
+    try{
+      const { data, error }=await sb.functions.invoke('readonly-calendars-status',{ body:{} });
+      if(error||data?.error) throw new Error(data?.error||error.message);
+      const cals=data.calendars||[];
+      el.innerHTML=cals.length?cals.map(c=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);">
+          <div style="min-width:0;"><div style="font-weight:500;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.label||c.google_email||'Agenda')}</div>${c.google_email?`<div style="font-size:11.5px;color:var(--ink-faint);">${esc(c.google_email)}</div>`:''}</div>
+          <button class="del-chip" onclick="removeReadonlyCalendar('${c.id}')" title="Ontkoppelen">${ICO.x}</button>
+        </div>`).join(''):'<span style="font-size:12.5px;color:var(--ink-faint);">Nog geen extra agenda\u2019s gekoppeld.</span>';
+    }catch(e){
+      el.innerHTML=`<span style="font-size:12.5px;color:var(--coral);">Kon niet laden: ${esc(e.message)}</span>`;
+    }
+  }
+  async function removeReadonlyCalendar(id){
+    if(!confirm('Deze agenda ontkoppelen?')) return;
+    const { data, error }=await sb.functions.invoke('readonly-calendar-disconnect',{ body:{ id } });
+    if(error||data?.error){ toast('Ontkoppelen mislukt: '+(data?.error||error.message)); return; }
+    loadReadonlyCalendars();
   }
   // ================= MELDINGEN (webpush, Android + iOS 16.4+ als PWA) =================
   function isIOS(){ return /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
@@ -1275,7 +1325,7 @@
   async function showApp(){
     loginScreen.classList.add('hidden'); app.classList.remove('hidden');
     if($('dashHint')) $('dashHint').textContent=`${greeting()}, Daan \u{1F44B} \u2014 dit is wat er speelt in je tweede brein.`;
-    await Promise.all([loadNotebooks(), loadCoacheeList(), loadTemplateList(), loadRecBuckets(), loadNoteBuckets(), loadBookBuckets(), loadNotesIndex(), loadBuckets()]);
+    await Promise.all([loadNotebooks(), loadCoacheeList(), loadTemplateList(), loadRecBuckets(), loadNoteBuckets(), loadBookBuckets(), loadNotesIndex(), loadBuckets(), loadDashConfig()]);
     switchTab('dash'); handleShareTarget(); refreshGoogleStatusUI(); handleGoogleOAuthCallback();
   }
   async function doLogout(){ await sb.auth.signOut(); app.classList.add('hidden'); loginScreen.classList.remove('hidden'); loginBtn.disabled=false; loginBtn.textContent='Inloggen'; $('password').value=''; }
@@ -4054,15 +4104,34 @@
     {id:'spark',   name:'Uit je archief',      wide:false},
     {id:'quick',   name:'Snelle start',       wide:false},
   ];
-  let dashConfig=JSON.parse(localStorage.getItem('dashConfig')||'null');
-  if(!dashConfig){ dashConfig={ order:DASH_BLOCKS.map(b=>b.id), hidden:[], sizes:{} }; }
-  if(!dashConfig.sizes) dashConfig.sizes={}; // bestaande gebruikers die dit nog niet hadden
-  // Het 'hello'-welkomstblok bestaat niet meer als los blok \u2014 die boodschap staat nu bovenaan de pagina.
-  // Bestaande, eerder opgeslagen volgorde/verborgen-lijst hiervan opschonen zodat er geen leeg vakje overblijft.
-  dashConfig.order=(dashConfig.order||[]).filter(id=>id!=='hello');
-  dashConfig.hidden=(dashConfig.hidden||[]).filter(id=>id!=='hello');
-  DASH_BLOCKS.forEach(b=>{ if(!dashConfig.order.includes(b.id)) dashConfig.order.push(b.id); }); // nieuwe blokken automatisch toevoegen voor bestaande gebruikers
-  function saveDash(){ localStorage.setItem('dashConfig',JSON.stringify(dashConfig)); }
+  let dashConfig={ order:DASH_BLOCKS.map(b=>b.id), hidden:[], sizes:{} };
+  async function loadDashConfig(){
+    try{
+      const { data:{ user } }=await sb.auth.getUser();
+      const { data }=await sb.from('dashboard_config').select('config').eq('user_id',user.id).maybeSingle();
+      let cfg=(data?.config && data.config.order)?data.config:null;
+      if(!cfg){
+        // Eenmalige migratie: stond hier nog een lokale (browser-gebonden) indeling? Neem die over als startpunt,
+        // zodat je bestaande indeling niet verdwijnt zodra dit apparaat voor het eerst synchroniseert.
+        try{ const local=JSON.parse(localStorage.getItem('dashConfig')||'null'); if(local && local.order) cfg=local; }catch(_e){}
+      }
+      if(!cfg){ cfg={ order:DASH_BLOCKS.map(b=>b.id), hidden:[], sizes:{} }; }
+      if(!cfg.sizes) cfg.sizes={};
+      if(!cfg.hidden) cfg.hidden=[];
+      // Het 'hello'-welkomstblok bestaat niet meer als los blok \u2014 die boodschap staat nu bovenaan de pagina.
+      cfg.order=(cfg.order||[]).filter(id=>id!=='hello');
+      cfg.hidden=(cfg.hidden||[]).filter(id=>id!=='hello');
+      DASH_BLOCKS.forEach(b=>{ if(!cfg.order.includes(b.id)) cfg.order.push(b.id); }); // nieuwe blokken automatisch toevoegen voor bestaande gebruikers
+      dashConfig=cfg;
+      saveDash(); // meteen wegschrijven, ook als er niks veranderde \u2014 zo staat de migratie/opschoning ook synchroon voor andere apparaten
+    }catch(_e){ /* stille fallback: dashConfig blijft op het lokale standaard-object staan voor deze sessie */ }
+  }
+  async function saveDash(){
+    try{
+      const { data:{ user } }=await sb.auth.getUser();
+      await sb.from('dashboard_config').upsert({ user_id:user.id, config:dashConfig, updated_at:new Date().toISOString() });
+    }catch(_e){ /* stille fallback: lokaal blijft alles gewoon werken, alleen sync mislukt dan even */ }
+  }
   function blockSize(id){
     const meta=DASH_BLOCKS.find(b=>b.id===id);
     return dashConfig.sizes[id]||(meta?.wide?'full':'half');
@@ -5992,6 +6061,12 @@ Als Daan op enig moment aangeeft dat je het gesprek moet bewaren \u2014 bijvoorb
       sb.channel('brain-sync')
         .on('postgres_changes',{ event:'*', schema:'public' },payload=>{
           const table=payload.table;
+          if(table==='dashboard_config'){
+            if(activeTab!=='dash' || dashEdit) return; // niet overschrijven terwijl je zelf actief aan het slepen bent
+            clearTimeout(rtTimer);
+            rtTimer=setTimeout(()=>{ loadDashConfig().then(renderDash); },1500);
+            return;
+          }
           const map={ recordings:'rec', notes:'note', inspiration:'insp', book_summaries:'book', documents:'doc', action_items:'rec', appointments:'coach', coachees:'coach' };
           const tab=map[table];
           if(!tab||tab!==activeTab) return;
