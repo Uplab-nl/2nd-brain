@@ -490,7 +490,12 @@
   .insp-grid { columns:3 260px; column-gap:10px; padding-bottom:80px; }
   .insp-card { break-inside:avoid; background:var(--card); border-radius:14px; box-shadow:var(--shadow-sm); border:1.5px solid var(--line); margin-bottom:10px; transition:transform .15s,box-shadow .15s,border-color .15s; position:relative; }
   .insp-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); }
-  .insp-card img { width:100%; display:block; border-radius:12px 12px 0 0; }
+  .insp-card img { width:100%; display:block; border-radius:12px 12px 0 0; cursor:zoom-in; }
+  .img-lightbox { position:fixed; inset:0; background:rgba(20,20,28,.92); z-index:200; display:flex; align-items:center; justify-content:center; padding:30px; cursor:zoom-out; animation:fadeIn .15s ease; }
+  .img-lightbox img { max-width:100%; max-height:100%; border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,.5); cursor:default; }
+  .img-lightbox .lb-close { position:absolute; top:18px; right:22px; width:40px; height:40px; border-radius:50%; border:none; background:rgba(255,255,255,.15); color:#fff; font-size:22px; line-height:1; cursor:pointer; }
+  .img-lightbox .lb-close:hover { background:rgba(255,255,255,.28); }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
   .insp-card .ic-body { padding:14px 16px; }
   .insp-card .ic-title { font-weight:600; font-size:14.5px; margin-bottom:4px; word-break:break-word; }
   .insp-card .ic-note { font-size:13px; color:var(--ink-soft); white-space:pre-wrap; word-break:break-word; }
@@ -5716,6 +5721,17 @@ Als Daan op enig moment aangeeft dat je het gesprek moet bewaren \u2014 bijvoorb
   }
 
   let inspLimit=50;
+  function openImageLightbox(url){
+    const ov=document.createElement('div');
+    ov.className='img-lightbox';
+    ov.innerHTML=`<button class="lb-close" title="Sluiten">&times;</button><img src="${esc(url)}" alt="">`;
+    const close=()=>ov.remove();
+    ov.addEventListener('mousedown',e=>{ if(e.target===ov) close(); });
+    ov.querySelector('.lb-close').onclick=close;
+    const onEsc=e=>{ if(e.key==='Escape'){ close(); document.removeEventListener('keydown',onEsc); } };
+    document.addEventListener('keydown',onEsc);
+    document.body.appendChild(ov);
+  }
   async function loadInspiration(){
     const grid=$('inspGrid');
     if(!inspBuckets.length) await loadBuckets(); else renderBucketBar();
@@ -5742,7 +5758,7 @@ Als Daan op enig moment aangeeft dat je het gesprek moet bewaren \u2014 bijvoorb
       let media='';
       if(i.kind==='image' && i.image_path){
         const { data }=await sb.storage.from('Inspiration').createSignedUrl(i.image_path,3600);
-        if(data?.signedUrl) media=`<img src="${data.signedUrl}" alt="">`;
+        if(data?.signedUrl) media=`<img src="${data.signedUrl}" alt="" onclick="event.stopPropagation();openImageLightbox('${escJs(data.signedUrl)}')">`;
       } else if(i.kind==='video' && i.url){
         const emb=ytEmbed(i.url)||vimeoEmbed(i.url);
         media=emb?`<div class="insp-video"><iframe src="${emb}" allowfullscreen loading="lazy"></iframe></div><a href="${esc(i.url)}" target="_blank" rel="noopener" style="display:block;padding:8px 14px;font-size:12px;color:var(--blue);border-top:1px solid var(--line);">\u25B6 Openen op YouTube \u2197</a>`:'';
