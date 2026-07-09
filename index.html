@@ -559,6 +559,7 @@
       <div class="snav" data-tab="map" onclick="switchTab('map')"><span class="ic" style="background:linear-gradient(135deg,#6366f1,#22d3ee)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="19" cy="18" r="1.8"/><path d="M10 11 6.4 7M14 11l3.6-4M14 13l3.6 4"/></svg></span> Mindmaps</div>
       <div class="snav" data-tab="insp" onclick="switchTab('insp')"><span class="ic" style="background:linear-gradient(135deg,#3dd6b0,#5a9cff)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 6l1.4 1.4M19 6l-1.4 1.4M4 12H2M22 12h-2"/><path d="M9 16a5 5 0 1 1 6 0c-.6.5-1 1-1 2h-4c0-1-.4-1.5-1-2z"/><path d="M10 21h4"/></svg></span> Inspiratie</div>
       <div class="snav" data-tab="book" onclick="switchTab('book')"><span class="ic" style="background:linear-gradient(135deg,#f59e0b,#b45309)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M18 16H7a2 2 0 0 0-2 2"/></svg></span> Boeken</div>
+      <div class="snav" data-tab="mail" onclick="switchTab('mail')"><span class="ic" style="background:linear-gradient(135deg,#5a9cff,#3dd6b0)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="m3 6.5 9 6.5 9-6.5"/></svg></span> Mail</div>
       <div class="snav" data-tab="doc" onclick="switchTab('doc')"><span class="ic" style="background:linear-gradient(135deg,#64748b,#334155)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v5h5"/></svg></span> Documenten</div>
       <div class="snav" data-tab="coach" onclick="switchTab('coach')"><span class="ic" style="background:linear-gradient(135deg,#8a5cff,#ff5adb)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 6.5a3 3 0 0 1 0 5.5"/><path d="M18 20a6 6 0 0 0-3-5.2"/></svg></span> Coachees</div>
     </nav>
@@ -779,6 +780,17 @@
         <button class="act" onclick="openDocUploadPopup()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#3b82f6,#6366f1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg></span>Document uploaden</button>
       </div>
       <div id="docCards" class="feed"></div>
+    </div>
+
+    <!-- Mail -->
+    <div id="paneMail" class="hidden">
+      <div class="block-toolbar" style="flex-wrap:wrap;align-items:center;">
+        <select id="mailAccountSelect" onchange="onMailAccountChange()" style="max-width:260px;"></select>
+        <button class="act primary" onclick="openComposeMail()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#5a9cff,#3dd6b0)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>Nieuw bericht</button>
+        <button class="act" id="mailRefreshBtn" onclick="loadMailList()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14.6-4.6"/><path d="M20 12a8 8 0 0 1-14.6 4.6"/><path d="M18 4v4h-4"/><path d="M6 20v-4h4"/></svg></span>Ververs</button>
+        <button class="act" onclick="openMailConnect()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)">&#128233;</span>Postbus koppelen</button>
+      </div>
+      <div id="mailList" class="feed"></div>
     </div>
 
     <div id="feed" class="feed"></div>
@@ -1012,23 +1024,188 @@
       <label>E-mailadres</label><input type="text" id="imEmail" placeholder="jij@voorbeeld.nl">
       <label>Wachtwoord</label><input type="password" id="imPass" placeholder="Het liefst een apart, sterk wachtwoord">
       <label>IMAP-server</label><input type="text" id="imHost" value="imap.strato.de">
-      <label>Poort</label><input type="text" id="imPort" value="993">
+      <label>IMAP-poort</label><input type="text" id="imPort" value="993">
+      <label>SMTP-server <span style="font-weight:400;color:var(--ink-faint);">(voor versturen)</span></label><input type="text" id="imSmtpHost" value="smtp.strato.de">
+      <label>SMTP-poort</label><input type="text" id="imSmtpPort" value="465">
       <label>Label (optioneel)</label><input type="text" id="imLabel" placeholder="Bijv. Werkmail Strato">
       <div class="sheet-actions"><button class="act" id="imCancel">Annuleren</button><button class="act primary" id="imSave">Verbinden</button></div>
       <div id="imStatus" style="margin-top:10px;font-size:13px;color:var(--purple);min-height:16px;"></div>`;
     openSheet('\u{1F4E5} IMAP-postbus koppelen', body, (ov,close)=>{
       $('imCancel').onclick=close;
+      // Als iemand de IMAP-server aanpast, schuift het SMTP-veld automatisch mee (tenzij al zelf aangepast).
+      let smtpTouched=false;
+      $('imSmtpHost').addEventListener('input',()=>{ smtpTouched=true; });
+      $('imHost').addEventListener('input',()=>{
+        if(smtpTouched) return;
+        const h=$('imHost').value.trim();
+        $('imSmtpHost').value = h.replace(/^imap\./i,'smtp.');
+      });
       $('imSave').onclick=async()=>{
         const email=$('imEmail').value.trim(), password=$('imPass').value;
         const host=$('imHost').value.trim()||'imap.strato.de', port=$('imPort').value.trim()||'993';
+        const smtp_host=$('imSmtpHost').value.trim()||host.replace(/^imap\./i,'smtp.');
+        const smtp_port=$('imSmtpPort').value.trim()||'465';
         const label=$('imLabel').value.trim();
         const status=$('imStatus'), btn=$('imSave');
         if(!email||!password){ status.textContent='Vul e-mail en wachtwoord in.'; return; }
         status.textContent='Verbinden\u2026'; btn.disabled=true;
-        const { data, error }=await sb.functions.invoke('imap-connect',{ body:{ email, password, host, port, label } });
+        const { data, error }=await sb.functions.invoke('imap-connect',{ body:{ email, password, host, port, label, smtp_host, smtp_port } });
         if(error||data?.error){ status.textContent='Mislukt: '+(data?.error||error.message); btn.disabled=false; return; }
         status.textContent='Verbonden \u2713';
         setTimeout(()=>{ close(); loadMailStatus(); },700);
+      };
+    });
+  }
+
+  // ================= MAIL LEZEN & VERSTUREN =================
+  let mailAccounts=[], activeMailAccountId=null, activeMailMessages=[];
+  async function loadMailPane(){
+    const sel=$('mailAccountSelect'), list=$('mailList');
+    if(list) list.innerHTML='<p style="color:var(--ink-faint);font-size:13.5px;padding:20px 0;">Postbussen laden\u2026</p>';
+    try{
+      const { data, error }=await sb.functions.invoke('mail-status',{ body:{} });
+      if(error||data?.error) throw new Error(data?.error||error.message);
+      mailAccounts=data.imap_accounts||[];
+    }catch(e){
+      mailAccounts=[];
+    }
+    if(!mailAccounts.length){
+      if(sel) sel.innerHTML='';
+      if(list) list.innerHTML='<div class="empty"><div class="big">Nog geen postbus gekoppeld</div><p>Koppel je Strato-mail om hem hier te lezen en te versturen.</p><button class="act primary" onclick="openMailConnect()" style="margin-top:8px;">Postbus koppelen</button></div>';
+      return;
+    }
+    if(sel) sel.innerHTML=mailAccounts.map(a=>`<option value="${a.id}">${esc(a.label||a.email)}</option>`).join('');
+    const remembered=localStorage.getItem('lastMailAccount');
+    activeMailAccountId = mailAccounts.find(a=>a.id===remembered)?.id || mailAccounts[0].id;
+    if(sel) sel.value=activeMailAccountId;
+    loadMailList();
+  }
+  function onMailAccountChange(){
+    activeMailAccountId=$('mailAccountSelect').value;
+    localStorage.setItem('lastMailAccount',activeMailAccountId);
+    loadMailList();
+  }
+  async function loadMailList(){
+    const list=$('mailList');
+    if(!activeMailAccountId){ return; }
+    if(list) list.innerHTML='<p style="color:var(--ink-faint);font-size:13.5px;padding:20px 0;">Postvak laden\u2026</p>';
+    const { data, error }=await sb.functions.invoke('mail-list',{ body:{ account_id:activeMailAccountId, folder:'INBOX', limit:30 } });
+    if(error||data?.error){
+      if(list) list.innerHTML=`<div class="empty"><div class="big">Kon postvak niet laden</div><p>${esc(data?.error||error.message)}</p></div>`;
+      return;
+    }
+    activeMailMessages=data.messages||[];
+    renderMailList();
+  }
+  function renderMailList(){
+    const list=$('mailList'); if(!list) return;
+    if(!activeMailMessages.length){ list.innerHTML='<div class="empty"><div class="big">Geen berichten</div><p>Dit postvak is nog leeg.</p></div>'; return; }
+    list.innerHTML=activeMailMessages.map(m=>{
+      const d=m.date?new Date(m.date):null;
+      const dateStr=d?d.toLocaleDateString('nl-NL',{day:'numeric',month:'short'})+' \u00b7 '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}):'';
+      return `<article class="card" style="cursor:pointer;${m.seen?'':'border-left:3px solid var(--purple);'}" onclick="openMailMessage('${escJs(String(m.uid))}')">
+        <div class="card-head">
+          <div style="min-width:0;flex:1;">
+            <div class="card-title" style="font-weight:${m.seen?'500':'700'};">${esc(m.from_name||m.from_email||'Onbekende afzender')}</div>
+            <div class="card-meta">${esc(m.subject)}</div>
+          </div>
+          <span style="font-size:11.5px;color:var(--ink-faint);white-space:nowrap;">${dateStr}</span>
+        </div>
+      </article>`;
+    }).join('');
+  }
+  async function openMailMessage(uid){
+    const acc=mailAccounts.find(a=>a.id===activeMailAccountId);
+    const { ov, close }=openSheet('\u{1F4E7} Bericht', '<p style="color:var(--ink-faint);font-size:13.5px;">Laden\u2026</p>', ()=>{});
+    const { data, error }=await sb.functions.invoke('mail-message',{ body:{ account_id:activeMailAccountId, folder:'INBOX', uid } });
+    if(error||data?.error){
+      ov.querySelector('.sheet-body').innerHTML=`<p style="color:var(--ink-faint);">Kon bericht niet laden: ${esc(data?.error||error.message)}</p>`;
+      return;
+    }
+    ov.querySelector('.sheet-head h3').textContent = data.subject||'(geen onderwerp)';
+    const d=data.date?new Date(data.date):null;
+    const dateStr=d?d.toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'})+' \u00b7 '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}):'';
+    let bodyHtml;
+    if(data.html){
+      bodyHtml=`<iframe id="mailFrame" sandbox="allow-same-origin" style="width:100%;border:0;min-height:120px;background:#fff;border-radius:10px;" srcdoc="${esc(data.html)}"></iframe>`;
+    }else{
+      bodyHtml=`<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;">${esc(data.text||'(geen inhoud)')}</div>`;
+    }
+    ov.querySelector('.sheet-body').innerHTML=`
+      <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--line);">
+        <div style="font-weight:600;font-size:14.5px;">${esc(data.from_name||data.from_email)}</div>
+        <div style="font-size:12.5px;color:var(--ink-faint);">${esc(data.from_email)}${data.to?' \u00b7 aan '+esc(data.to):''} \u00b7 ${dateStr}</div>
+      </div>
+      <div id="mailBodyWrap">${bodyHtml}</div>
+      <div class="sheet-actions" style="margin-top:16px;flex-wrap:wrap;">
+        <button class="act" id="mailReplyBtn">\u21A9\uFE0F Beantwoorden</button>
+        <button class="act" id="mailReplyAllBtn">\u21A9\uFE0F\u{1F465} Allen beantwoorden</button>
+        <button class="act" id="mailForwardBtn">\u27A1\uFE0F Doorsturen</button>
+        <button class="act" id="mailMoveBtn">\u{1F4C1} Verplaatsen</button>
+        <button class="act" id="mailCloseBtn">Sluiten</button>
+      </div>`;
+    $('mailCloseBtn').onclick=close;
+    $('mailReplyBtn').onclick=()=>{ close(); openComposeMail({ to:data.from_email, subject:data.subject, quote:data.text, in_reply_to:data.message_id, prefix:'Re: ' }); };
+    $('mailReplyAllBtn').onclick=()=>{
+      const others=[...(data.to_list||[]),...(data.cc_list||[])].map(p=>p.address).filter(a=>a && a.toLowerCase()!==acc?.email?.toLowerCase() && a.toLowerCase()!==data.from_email?.toLowerCase());
+      close(); openComposeMail({ to:data.from_email, cc:[...new Set(others)].join(', '), subject:data.subject, quote:data.text, in_reply_to:data.message_id, prefix:'Re: ' });
+    };
+    $('mailForwardBtn').onclick=()=>{
+      const header=`\u2014\u2014\u2014 Doorgestuurd bericht \u2014\u2014\u2014\nVan: ${data.from_name?data.from_name+' <'+data.from_email+'>':data.from_email}\nDatum: ${dateStr}\nOnderwerp: ${data.subject}\nAan: ${data.to}\n\n${data.text||''}`;
+      close(); openComposeMail({ to:'', subject:data.subject, quote:header, prefix:'Fwd: ', skipDefaultQuoteHeader:true });
+    };
+    $('mailMoveBtn').onclick=async()=>{
+      const btn=$('mailMoveBtn'); btn.disabled=true; btn.textContent='Mappen laden\u2026';
+      const { data:fd, error:ferr }=await sb.functions.invoke('mail-folders',{ body:{ account_id:activeMailAccountId } });
+      btn.disabled=false; btn.textContent='\u{1F4C1} Verplaatsen';
+      if(ferr||fd?.error){ toast('Kon mappen niet laden: '+(fd?.error||ferr.message)); return; }
+      const options=(fd.folders||[]).filter(f=>f.path!=='INBOX').map(f=>`<option value="${esc(f.path)}">${esc(f.name||f.path)}</option>`).join('');
+      const moveBody=`<label>Verplaats naar</label><select id="mvFolder">${options}</select>
+        <div class="sheet-actions"><button class="act" id="mvCancel">Annuleren</button><button class="act primary" id="mvGo">Verplaatsen</button></div>
+        <div id="mvStatus" style="margin-top:10px;font-size:13px;color:var(--purple);min-height:16px;"></div>`;
+      openSheet('\u{1F4C1} Bericht verplaatsen', moveBody, (mov,mclose)=>{
+        $('mvCancel').onclick=mclose;
+        $('mvGo').onclick=async()=>{
+          const target=$('mvFolder').value, st=$('mvStatus'), gobtn=$('mvGo');
+          if(!target) return;
+          st.textContent='Verplaatsen\u2026'; gobtn.disabled=true;
+          const { data:md, error:merr }=await sb.functions.invoke('mail-move',{ body:{ account_id:activeMailAccountId, folder:'INBOX', uid, target_folder:target } });
+          if(merr||md?.error){ st.textContent='Mislukt: '+(md?.error||merr.message); gobtn.disabled=false; return; }
+          toast('Bericht verplaatst \u2713');
+          mclose(); close(); loadMailList();
+        };
+      });
+    };
+    const frame=$('mailFrame');
+    if(frame){ frame.addEventListener('load',()=>{ try{ frame.style.height=(frame.contentDocument.body.scrollHeight+20)+'px'; }catch(_e){ frame.style.height='400px'; } }); }
+  }
+  function openComposeMail(prefill){
+    prefill=prefill||{};
+    if(!mailAccounts.length){ toast('Koppel eerst een postbus om mail te kunnen versturen'); openMailConnect(); return; }
+    const fromOptions=mailAccounts.map(a=>`<option value="${a.id}" ${a.id===activeMailAccountId?'selected':''}>${esc(a.label||a.email)}</option>`).join('');
+    const quoted=prefill.quote?(prefill.skipDefaultQuoteHeader?`\n\n${prefill.quote}`:`\n\n\u2014\u2014\u2014 oorspronkelijk bericht \u2014\u2014\u2014\n${prefill.quote}`):'';
+    const prefix=prefill.prefix||'';
+    const subjectVal=prefill.subject?(new RegExp('^'+prefix.trim().replace(':','')+':','i').test(prefill.subject)?prefill.subject:prefix+prefill.subject):'';
+    const body=`
+      ${mailAccounts.length>1?`<label>Van</label><select id="cmFrom">${fromOptions}</select>`:''}
+      <label>Aan</label><input type="text" id="cmTo" value="${esc(prefill.to||'')}" placeholder="naam@voorbeeld.nl">
+      <label>Cc <span style="font-weight:400;color:var(--ink-faint);">(optioneel)</span></label><input type="text" id="cmCc" value="${esc(prefill.cc||'')}" placeholder="Meerdere adressen, gescheiden door een komma">
+      <label>Onderwerp</label><input type="text" id="cmSubject" value="${esc(subjectVal)}">
+      <label>Bericht</label><textarea id="cmBody" style="min-height:220px;">${esc(quoted)}</textarea>
+      <div class="sheet-actions"><button class="act" id="cmCancel">Annuleren</button><button class="act primary" id="cmSend">Versturen</button></div>
+      <div id="cmStatus" style="margin-top:10px;font-size:13px;color:var(--purple);min-height:16px;"></div>`;
+    openSheet('\u2709\uFE0F Nieuw bericht', body, (ov,close)=>{
+      $('cmCancel').onclick=close;
+      $('cmSend').onclick=async()=>{
+        const fromId = mailAccounts.length>1 ? $('cmFrom').value : activeMailAccountId;
+        const to=$('cmTo').value.trim(), cc=$('cmCc').value.trim(), subject=$('cmSubject').value.trim(), text=$('cmBody').value;
+        const status=$('cmStatus'), btn=$('cmSend');
+        if(!to||!subject){ status.textContent='Vul minstens een ontvanger en onderwerp in.'; return; }
+        status.textContent='Versturen\u2026'; btn.disabled=true;
+        const { data, error }=await sb.functions.invoke('mail-send',{ body:{ account_id:fromId, to, cc:cc||undefined, subject, text, in_reply_to:prefill.in_reply_to||undefined } });
+        if(error||data?.error){ status.textContent='Mislukt: '+(data?.error||error.message); btn.disabled=false; return; }
+        toast(data.saved_to_sent ? 'Bericht verstuurd \u2713 (staat ook in Verzonden)' : 'Bericht verstuurd \u2713');
+        close();
       };
     });
   }
@@ -1339,7 +1516,7 @@
     activeNB='all'; // voorkomt dat een notitieboek-filter onzichtbaar meereist naar een ander tabblad
     document.querySelectorAll('.snav').forEach(el=>el.classList.toggle('active',el.dataset.tab===t));
     document.querySelectorAll('.sb-daintop button').forEach(el=>el.classList.toggle('active',t==='chat'));
-    const panes={dash:'paneDash',fav:'paneFav',rec:'paneRec',note:'paneNote',chat:'paneChat',map:'paneMap',insp:'paneInsp',coach:'paneCoach',tpl:'paneTpl',book:'paneBook',doc:'paneDoc',search:'paneSearch'};
+    const panes={dash:'paneDash',fav:'paneFav',rec:'paneRec',note:'paneNote',chat:'paneChat',map:'paneMap',insp:'paneInsp',coach:'paneCoach',tpl:'paneTpl',book:'paneBook',doc:'paneDoc',mail:'paneMail',search:'paneSearch'};
     Object.entries(panes).forEach(([k,id])=>{ const el=$(id); if(el) el.classList.toggle('hidden',t!==k); });
     $('feed').classList.toggle('hidden',t!=='rec');
     $('sidebar').classList.remove('open');
@@ -1351,6 +1528,7 @@
     else if(t==='tpl'){ loadTemplates(); }
     else if(t==='book'){ loadBooks(); }
     else if(t==='doc'){ loadDocuments(); }
+    else if(t==='mail'){ loadMailPane(); }
     else if(t==='rec'||t==='note'){ load(); }
   }
 
@@ -1441,7 +1619,7 @@
   async function openNotebook(id){
     activeTab='nb';
     document.querySelectorAll('.snav').forEach(el=>el.classList.remove('active'));
-    ['paneDash','paneFav','paneRec','paneNote','paneChat','paneMap','paneInsp','paneCoach','paneTpl','paneBook','paneDoc','paneSearch'].forEach(p=>{ const el=$(p); if(el) el.classList.add('hidden'); });
+    ['paneDash','paneFav','paneRec','paneNote','paneChat','paneMap','paneInsp','paneCoach','paneTpl','paneBook','paneDoc','paneMail','paneSearch'].forEach(p=>{ const el=$(p); if(el) el.classList.add('hidden'); });
     $('feed').classList.remove('hidden');
     $('sidebar').classList.remove('open');
     renderNBView(id);
@@ -4331,7 +4509,7 @@
     let lastErr=null;
     for(let poging=0;poging<2;poging++){
       try{
-        const { data, error }=await sb.functions.invoke('daily-briefing',{ body:{} });
+        const { data, error }=await sb.functions.invoke('daily-briefing',{ body:{ force:!!force } });
         if(error||data?.error) throw new Error(data?.error||error.message);
         dashData.briefingMessage=data.message;
         lastErr=null;
