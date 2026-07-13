@@ -5003,13 +5003,15 @@
     const timer=setInterval(async()=>{
       tries++;
       const { data:rec }=await sb.from('recordings').select('status').eq('id',id).maybeSingle();
-      if(!rec || rec.status!=='transcribing'){
+      // 'transcribed' is nu geen eindstation meer \u2014 Dain analyseert automatisch door naar 'summarized'.
+      // Blijf dus pollen tot dat klaar is (of het misgaat), in plaats van te stoppen bij 'transcribed'.
+      if(!rec || (rec.status!=='transcribing' && rec.status!=='transcribed')){
         clearInterval(timer);
-        if(rec?.status==='transcribed') embedContent('recordings',id);
+        if(rec?.status==='summarized') embedContent('recordings',id);
         load();
         return;
       }
-      if(tries>60) clearInterval(timer); // na ~15 min stoppen we met pollen; de handmatige 'vastgelopen?'-knop blijft beschikbaar
+      if(tries>80) clearInterval(timer); // na ~20 min stoppen we met pollen; de handmatige knop blijft beschikbaar
     },15000);
   }
 
