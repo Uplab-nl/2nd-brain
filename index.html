@@ -628,14 +628,14 @@
     <!-- Opname-upload -->
     <div id="paneRec" class="hidden">
       <div class="block-toolbar">
-        <button class="act" onclick="openUploadPopup()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#ff6b5a,#ff5a8a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg></span>Bestand uploaden</button>
+        <button class="act" id="plaudSyncBtn" onclick="syncPlaud()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#ff6b5a,#ff5a8a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14.6-4.6"/><path d="M20 12a8 8 0 0 1-14.6 4.6"/><path d="M18 4v4h-4"/><path d="M6 20v-4h4"/></svg></span>Plaud updaten</button>
         <button class="act" onclick="openLiveRec()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#ff6b5a,#ff5a8a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v4"/></svg></span>Direct opnemen</button>
         <button class="act" onclick="openVoiceGPT()" style="display:inline-flex;align-items:center;gap:8px;"><span class="mi" style="background:linear-gradient(135deg,#549E39,#7ac142)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.8-.9L3 20l1.1-4.3a8.4 8.4 0 0 1 15.9-4.2z"/></svg></span>Spar met GPT (voice)</button>
         <div class="menu-wrap">
           <button class="menu-btn" onclick="toggleMenu('recMenu')" title="Meer opties">&#9776;</button>
           <div class="dropdown-menu hidden" id="recMenu">
+            <button class="act" onclick="openUploadPopup();toggleMenu('recMenu')"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg></span>Bestand uploaden</button>
             <button class="act" onclick="openTemplatePicker();toggleMenu('recMenu')"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>Templates</button>
-            <button class="act" id="plaudSyncBtn" onclick="syncPlaud();toggleMenu('recMenu')"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14.6-4.6"/><path d="M20 12a8 8 0 0 1-14.6 4.6"/><path d="M18 4v4h-4"/><path d="M6 20v-4h4"/></svg></span>Sync met Plaud</button>
             <button class="act" onclick="connectPlaud();toggleMenu('recMenu')" title="Plaud-koppeling (opnieuw) instellen"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M11 12 20.5 2.5"/><path d="M16 7l3 3"/></svg></span>Plaud koppelen</button>
             <button class="act" onclick="openCustomTermsPopup();toggleMenu('recMenu')" title="Namen en vaktermen die Whisper vaak verkeerd verstaat"><span class="mi" style="background:linear-gradient(135deg,#9aa3b2,#6b7280)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7"/></svg></span>Woordenlijst</button>
           </div>
@@ -5002,12 +5002,15 @@
     let tries=0;
     const timer=setInterval(async()=>{
       tries++;
-      const { data:rec }=await sb.from('recordings').select('status').eq('id',id).maybeSingle();
-      // 'transcribed' is nu geen eindstation meer \u2014 Dain analyseert automatisch door naar 'summarized'.
-      // Blijf dus pollen tot dat klaar is (of het misgaat), in plaats van te stoppen bij 'transcribed'.
-      if(!rec || (rec.status!=='transcribing' && rec.status!=='transcribed')){
+      const { data:rec }=await sb.from('recordings').select('status,duration_sec').eq('id',id).maybeSingle();
+      if(!rec){ clearInterval(timer); load(); return; }
+      // Onder de 3 minuten analyseert Dain automatisch door naar 'summarized' \u2014 daar blijven we op wachten.
+      // Boven de 3 minuten stopt het vanzelf bij 'transcribed': daar wacht Dain op de handmatige knop.
+      const isShort = rec.duration_sec!=null && rec.duration_sec<=180;
+      const stillWaiting = rec.status==='transcribing' || (rec.status==='transcribed' && isShort);
+      if(!stillWaiting){
         clearInterval(timer);
-        if(rec?.status==='summarized') embedContent('recordings',id);
+        if(rec.status==='summarized'||rec.status==='transcribed') embedContent('recordings',id);
         load();
         return;
       }
