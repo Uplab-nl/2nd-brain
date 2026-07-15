@@ -1583,9 +1583,6 @@
             <span class="nb-name">${esc(n.name)}</span>
             <span class="nb-tools">
               <span class="nb-mini" title="Submap toevoegen" onclick="event.stopPropagation();newNotebook('${n.id}')">+</span>
-              <span class="nb-mini" title="Hernoemen" onclick="event.stopPropagation();renameNB('${n.id}')">✎</span>
-              <span class="nb-mini" title="${n.archived?'Terughalen uit archief':'Archiveren'}" onclick="event.stopPropagation();toggleArchive('${n.id}')">${n.archived?'↩':'🗄'}</span>
-              <span class="nb-mini" title="Verwijderen" onclick="event.stopPropagation();deleteNB('${n.id}')">✕</span>
             </span>
           </div>
           ${hasKids&&open?`<div class="nb-children">${branch(n.id,depth+1)}</div>`:''}
@@ -1600,14 +1597,10 @@
       html+=`<div class="nb-addroot" onclick="toggleShowArchived()" style="border-top:1px solid var(--line);margin-top:4px;padding-top:10px;">${showArchived?'\u25BC':'\u25B6'} Archief (${archived.length})</div>`;
       if(showArchived){
         html+=`<div class="nb-children">`+archived.map(n=>`
-          <div class="nb-row" style="opacity:.65;cursor:default;" onclick="event.stopPropagation()">
+          <div class="nb-row" style="opacity:.65;" onclick="pickNB('${n.id}')">
             <span class="nb-caret leaf"></span>
             <span class="nb-dot" style="background:${n.color||'#8a5cff'}"></span>
             <span class="nb-name">${esc(n.name)}</span>
-            <span class="nb-tools">
-              <span class="nb-mini" title="Terughalen uit archief" onclick="event.stopPropagation();toggleArchive('${n.id}')">\u21a9</span>
-              <span class="nb-mini" title="Verwijderen" onclick="event.stopPropagation();deleteNB('${n.id}')">\u2715</span>
-            </span>
           </div>`).join('')+`</div>`;
       }
     }
@@ -1673,6 +1666,17 @@
             <button class="act" onclick="nbQuickCreate('rec')"><span class="mi" style="background:linear-gradient(135deg,#ff6b5a,#ff5a8a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v4"/></svg></span>Opname uploaden</button>
             <button class="act" onclick="nbQuickCreate('book')"><span class="mi" style="background:linear-gradient(135deg,#ff9f43,#ff6b5a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M18 16H7a2 2 0 0 0-2 2"/></svg></span>Boek</button>
             <button class="act" onclick="nbQuickCreate('doc')"><span class="mi" style="background:linear-gradient(135deg,#3b82f6,#6366f1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v5h5"/></svg></span>Document uploaden</button>
+          </div>
+        </div>
+        <div class="menu-wrap">
+          <button class="menu-btn" onclick="toggleMenu('nbActionsMenu')" title="Notitieboek beheren">&#9776;</button>
+          <div class="dropdown-menu hidden" id="nbActionsMenu">
+            <button class="act" onclick="(async()=>{ toggleMenu('nbActionsMenu'); await renameNB('${id}'); renderNBView('${id}'); })()">\u270E Hernoemen</button>
+            <div style="display:flex;gap:7px;padding:8px 12px;">
+              ${NB_COLORS.map(c=>`<span onclick="(async()=>{ await setNBColor('${id}','${c}'); toggleMenu('nbActionsMenu'); renderNBView('${id}'); })()" title="${c}" style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer;flex-shrink:0;${nb.color===c?'box-shadow:0 0 0 2px var(--card),0 0 0 4px '+c+';':''}"></span>`).join('')}
+            </div>
+            <button class="act" onclick="(async()=>{ toggleMenu('nbActionsMenu'); const ok=await toggleArchive('${id}'); if(ok) pickNB('all'); })()">${nb.archived?'\u21A9 Terughalen uit archief':'\u{1F5C4}\uFE0F Archiveren'}</button>
+            <button class="act" onclick="(async()=>{ toggleMenu('nbActionsMenu'); const ok=await deleteNB('${id}'); if(ok) pickNB('all'); })()">\u2715 Verwijderen</button>
           </div>
         </div>
       </div>
@@ -1767,15 +1771,22 @@
   function toggleShowArchived(){ showArchived=!showArchived; renderTree(); }
 
   async function toggleArchive(id){
-    const nb=nbById(id); if(!nb) return;
+    const nb=nbById(id); if(!nb) return false;
     const { error }=await sb.from('notebooks').update({ archived:!nb.archived }).eq('id',id);
-    if(error){ toast('Kon niet archiveren: '+error.message); return; }
+    if(error){ toast('Kon niet archiveren: '+error.message); return false; }
     if(activeNB===id) activeNB='all';
     await loadNotebooks(); load();
+    return true;
+  }
+
+  async function setNBColor(id,color){
+    const { error }=await sb.from('notebooks').update({ color }).eq('id',id);
+    if(error){ toast('Kon kleur niet aanpassen: '+error.message); return; }
+    await loadNotebooks();
   }
 
   async function deleteNB(id){
-    const nb=nbById(id); if(!nb) return;
+    const nb=nbById(id); if(!nb) return false;
     // Tel wat er in zit (inclusief submappen) — via de link-tabellen, want alles kan nu aan meerdere notitieboeken hangen
     const ids=nbWithDescendants(id);
     const [noteIdsInNb,recIdsInNb,bookIdsInNb,inspIdsInNb,docIdsInNb]=await Promise.all([
@@ -1805,7 +1816,7 @@
           docIdsInNb.length?sb.from('document_notebook_links').delete().in('notebook_id',ids):null,
         ].filter(Boolean));
       } else {
-        if(!confirm(`Zeker weten? ${total} item(s) worden definitief verwijderd. Dit kan niet ongedaan gemaakt worden.`)) return;
+        if(!confirm(`Zeker weten? ${total} item(s) worden definitief verwijderd. Dit kan niet ongedaan gemaakt worden.`)) return false;
         await Promise.all([
           recIdsInNb.length?sb.from('recordings').delete().in('id',recIdsInNb):null,
           noteIdsInNb.length?sb.from('notes').delete().in('id',noteIdsInNb):null,
@@ -1815,13 +1826,14 @@
         ].filter(Boolean));
       }
     } else {
-      if(!confirm(msg)) return;
+      if(!confirm(msg)) return false;
     }
     // Notitieboek zelf verwijderen (submappen gaan via cascade mee)
     const { error }=await sb.from('notebooks').delete().eq('id',id);
-    if(error){ toast('Kon niet verwijderen: '+error.message); return; }
+    if(error){ toast('Kon niet verwijderen: '+error.message); return false; }
     if(activeNB===id||ids.includes(activeNB)) activeNB='all';
     await loadNotebooks(); load();
+    return true;
   }
 
   function nbById(id){ return allNotebooks.find(n=>n.id===id); }
@@ -4689,7 +4701,32 @@
           <span id="duebadge-${a.id}">${dueBadge(a.due_date)}</span>
         </div>
       </div>
+      <div style="display:flex;gap:4px;flex-shrink:0;">
+        <span class="nb-mini" title="Omzetten naar notitie" onclick="event.stopPropagation();convertActionToNote('${a.id}')">\u{1F4DD}</span>
+        <span class="nb-mini" title="Weggooien" onclick="event.stopPropagation();discardAction('${a.id}')">\u2715</span>
+      </div>
     </div>`;
+  }
+  // Actie omzetten in een losse notitie \u2014 tekst gaat mee, de actie zelf verdwijnt uit de actielijst
+  async function convertActionToNote(id){
+    const a=dashData.actions.find(x=>x.id===id); if(!a) return;
+    const { data:{ user } }=await sb.auth.getUser();
+    const { error:insErr }=await sb.from('notes').insert({ user_id:user.id, title:null, content:a.content });
+    if(insErr){ toast('Kon notitie niet aanmaken: '+insErr.message); return; }
+    const { error:delErr }=await sb.from('action_items').delete().eq('id',id);
+    if(delErr){ toast('Notitie aangemaakt, maar actie kon niet weggehaald worden: '+delErr.message); }
+    dashData.actions=dashData.actions.filter(x=>x.id!==id);
+    renderDash();
+    toast('Omgezet naar notitie \u2713');
+  }
+  // Actie definitief weggooien, zonder 'm ergens anders te bewaren
+  async function discardAction(id){
+    if(!confirm('Deze actie weggooien?')) return;
+    const { error }=await sb.from('action_items').delete().eq('id',id);
+    if(error){ toast('Kon actie niet weggooien: '+error.message); return; }
+    dashData.actions=dashData.actions.filter(x=>x.id!==id);
+    renderDash();
+    toast('Actie weggegooid');
   }
   // Klik op een actie \u2014 spring naar de opname waar hij uit gepikt is, zodat je de context/het gesprek terugziet
   function openActionSource(recId){
@@ -5022,8 +5059,22 @@
   // Haalt het specifieke item op (ongeacht welke pagina van de feed geladen is)
   // en zet het bovenaan met een 'terug'-knop, zodat je niet in een lege
   // 'nieuwe notitie'-composer of de verkeerde plek in de lijst belandt.
+  // Zelfde visuele wissel als switchTab, maar zonder de standaardlader van dat tabblad te starten.
+  // Nodig voor openSearchResult: die zet zelf al gericht 1 item neer, en anders overschrijft de
+  // normale 'laad alles'-aanroep van switchTab die specifieke kaart weer met de algemene lijst.
+  function switchTabNoLoad(t){
+    activeTab=t;
+    activeNB='all';
+    document.querySelectorAll('.snav').forEach(el=>el.classList.toggle('active',el.dataset.tab===t));
+    document.querySelectorAll('.sb-daintop button').forEach(el=>el.classList.toggle('active',t==='chat'));
+    const panes={dash:'paneDash',fav:'paneFav',rec:'paneRec',note:'paneNote',chat:'paneChat',map:'paneMap',insp:'paneInsp',coach:'paneCoach',tpl:'paneTpl',book:'paneBook',doc:'paneDoc',mail:'paneMail',search:'paneSearch'};
+    Object.entries(panes).forEach(([k,id])=>{ const el=$(id); if(el) el.classList.toggle('hidden',t!==k); });
+    $('feed').classList.toggle('hidden',t!=='rec');
+    $('sidebar').classList.remove('open');
+  }
+
   async function openSearchResult(kind,id){
-    switchTab(kind);
+    switchTabNoLoad(kind);
     const containerId={ note:'feedNote', rec:'feed', book:'bkCards', doc:'docCards' }[kind];
     const backLoader={ note:'loadNoteFeed', rec:'loadRecordings', book:'loadBooks', doc:'loadDocuments' }[kind];
     const el=$(containerId); if(!el) return;
