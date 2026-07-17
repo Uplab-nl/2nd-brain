@@ -4,8 +4,38 @@
 self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()); });
 self.addEventListener('fetch', (event) => {
-  event.respondWith(fetch(event.request).catch(() => new Response('Je bent offline — Second Brain heeft internet nodig.', { status: 503 })));
+  const req = event.request;
+  // Android's "Delen" (share) stuurt foto's/bestanden als POST-multipart naar index.html.
+  // GitHub Pages is statische hosting en kan geen POST verwerken, dus vangen we 'm hier op:
+  // we lezen de gedeelde data uit, parkeren 'm tijdelijk in de Cache API, en sturen de
+  // gebruiker met een gewone GET door naar de app zelf.
+  if (req.method === 'POST' && new URL(req.url).pathname.endsWith('/index.html')) {
+    event.respondWith(handleShareTargetPost(req));
+    return;
+  }
+  event.respondWith(fetch(req).catch(() => new Response('Je bent offline — Second Brain heeft internet nodig.', { status: 503 })));
 });
+
+async function handleShareTargetPost(req) {
+  try {
+    const formData = await req.formData();
+    const title = formData.get('shared_title') || '';
+    const text = formData.get('shared_text') || '';
+    const url = formData.get('shared_url') || '';
+    const files = formData.getAll('shared_files').filter((f) => f && typeof f.size === 'number' && f.size > 0);
+    const cache = await caches.open('share-target-v1');
+    await cache.put(
+      'share-meta',
+      new Response(JSON.stringify({ title, text, url, fileCount: files.length, fileTypes: files.map((f) => f.type) }))
+    );
+    for (let i = 0; i < files.length; i++) {
+      await cache.put(`share-file-${i}`, new Response(files[i]));
+    }
+    return Response.redirect('./index.html?shared=1', 303);
+  } catch (_e) {
+    return Response.redirect('./index.html', 303);
+  }
+}
 
 // ================= PUSHMELDINGEN =================
 // Toont een binnenkomende melding (verstuurd via de 'send-push' edge function).
