@@ -29,8 +29,6 @@
     --purple:#8a5cff; --blue:#5a9cff; --indigo:#7367f0;
     --grad-brand:linear-gradient(135deg,#ff5adb 0%,#ff9f43 100%);
     --grad-purple:linear-gradient(135deg,#8a5cff,#5a9cff);
-    --logo-grad-top:linear-gradient(135deg,#fd5296 0%,#fe7d43 100%);
-    --logo-grad-bottom:linear-gradient(135deg,#7a51f1,#4376f4);
     --shadow-sm:0 1px 3px rgba(44,44,58,.06),0 1px 2px rgba(44,44,58,.04);
     --shadow-md:0 4px 16px rgba(44,44,58,.08);
     --shadow-lg:0 12px 32px rgba(44,44,58,.12);
@@ -41,10 +39,10 @@
   .wrap { max-width:1120px; margin:0 auto; padding:0 32px; }
   .chev { width:36px; height:34px; position:relative; flex-shrink:0; }
   .chev span { position:absolute; width:20px; height:7px; border-radius:4px; top:11px; }
-  .chev .l { left:0; background:var(--logo-grad-top); transform:rotate(45deg); transform-origin:right center; }
-  .chev .r { right:0; background:var(--logo-grad-top); transform:rotate(-45deg); transform-origin:left center; }
-  .chev .l2 { left:0; top:19px; background:var(--logo-grad-bottom); transform:rotate(-45deg); transform-origin:right center; }
-  .chev .r2 { right:0; top:19px; background:var(--logo-grad-bottom); transform:rotate(45deg); transform-origin:left center; }
+  .chev .l { left:0; background:var(--grad-brand); transform:rotate(45deg); transform-origin:right center; }
+  .chev .r { right:0; background:var(--grad-brand); transform:rotate(-45deg); transform-origin:left center; }
+  .chev .l2 { left:0; top:19px; background:var(--grad-purple); transform:rotate(-45deg); transform-origin:right center; }
+  .chev .r2 { right:0; top:19px; background:var(--grad-purple); transform:rotate(45deg); transform-origin:left center; }
 
   .login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
   .login-card { background:var(--card); border-radius:20px; box-shadow:var(--shadow-lg); padding:48px 40px; width:100%; max-width:400px; text-align:center; }
@@ -493,8 +491,9 @@
 
   /* Inspiratie masonry */
   .insp-grid { columns:3 260px; column-gap:10px; padding-bottom:80px; }
-  .insp-card { break-inside:avoid; background:var(--card); border-radius:14px; box-shadow:var(--shadow-sm); border:1.5px solid var(--line); margin-bottom:10px; transition:transform .15s,box-shadow .15s,border-color .15s; position:relative; }
-  .insp-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); }
+  .insp-card { break-inside:avoid; background:var(--card); border-radius:14px; box-shadow:var(--shadow-sm); border:1.5px solid var(--line); margin-bottom:10px; transition:transform .15s,box-shadow .15s,border-color .15s; position:relative; z-index:1; }
+  .insp-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); z-index:2; }
+  .insp-card:has(.dropdown-menu:not(.hidden)) { z-index:50; }
   .insp-card img { width:100%; display:block; border-radius:12px 12px 0 0; cursor:zoom-in; }
   .img-lightbox { position:fixed; inset:0; background:rgba(20,20,28,.92); z-index:200; display:flex; align-items:center; justify-content:center; padding:30px; cursor:zoom-out; animation:fadeIn .15s ease; }
   .img-lightbox img { max-width:100%; max-height:100%; border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,.5); cursor:default; }
