@@ -1344,7 +1344,10 @@
       ${urlVal?`<label>Link</label><input type="url" id="qcUrl" value="${esc(urlVal)}">`:''}
       <label>Titel (optioneel)</label><input type="text" id="qcTitle" value="${esc(sTitle||'')}">
       <label>Notitie (optioneel)</label><textarea id="qcNote" placeholder="Waarom bewaar je dit?">${esc(noteVal)}</textarea>
-      <label>Bucket</label><select id="qcBucket">${bucketOptions('')}</select>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;"><label>Bucket</label><select id="qcBucket">${bucketOptions('')}</select></div>
+        <div style="flex:1;"><label>Notitieboek</label><select id="qcNotebook"><option value="">Geen notitieboek</option>${notebookOptions(activeNB!=='all'?activeNB:null)}</select></div>
+      </div>
       <div class="sheet-actions"><button class="act" id="qcCancel">Weggooien</button><button class="act primary" id="qcSave">Opslaan in Inspiratie</button></div>`;
     openSheet('\u26A1 Snel opgeslagen', body, (ov,close)=>{
       $('qcCancel').onclick=close;
@@ -1353,17 +1356,20 @@
         const note=$('qcNote').value.trim();
         const titleVal=$('qcTitle').value.trim();
         const bucketVal=$('qcBucket').value||null;
+        const nbVal=$('qcNotebook').value||null;
         const { data:{ user } }=await sb.auth.getUser();
         for(const f of sharedFiles){
           const safe=(f.name||'gedeeld').replace(/[^a-zA-Z0-9._-]/g,'_');
           const path=`${user.id}/${Date.now()}_${safe}`;
           const { error:upErr }=await sb.storage.from('Inspiration').upload(path,f);
           if(upErr){ toast('Upload mislukt: '+upErr.message); continue; }
-          await sb.from('inspiration').insert({ user_id:user.id, kind:'image', image_path:path, title:titleVal||null, content:note||null, bucket_id:bucketVal });
+          const { data:imgRow }=await sb.from('inspiration').insert({ user_id:user.id, kind:'image', image_path:path, title:titleVal||null, content:note||null, bucket_id:bucketVal }).select().single();
+          if(imgRow && nbVal) await setLinks('inspiration_notebook_links','inspiration_id',imgRow.id,'notebook_id',[nbVal]);
         }
         if(url || (note && !sharedFiles.length) || (titleVal && !sharedFiles.length)){
           const kind=url?((ytEmbed(url)||vimeoEmbed(url))?'video':'link'):'note';
-          await sb.from('inspiration').insert({ user_id:user.id, kind, url:url||null, title:titleVal||null, content:note||null, bucket_id:bucketVal });
+          const { data:row }=await sb.from('inspiration').insert({ user_id:user.id, kind, url:url||null, title:titleVal||null, content:note||null, bucket_id:bucketVal }).select().single();
+          if(row && nbVal) await setLinks('inspiration_notebook_links','inspiration_id',row.id,'notebook_id',[nbVal]);
         }
         close();
         if(activeTab==='insp') loadInspiration();
@@ -5909,7 +5915,10 @@ Als Daan op enig moment aangeeft dat je het gesprek moet bewaren \u2014 bijvoorb
       <label>Link (website of video-URL)</label><input type="url" id="ilUrl" placeholder="https://\u2026">
       <label>Titel (optioneel)</label><input type="text" id="ilTitle" placeholder="Waar gaat dit over?">
       <label>Notitie (optioneel)</label><textarea id="ilNote" placeholder="Waarom bewaar je dit?"></textarea>
-      <label>Bucket</label><select id="ilBucket">${bucketOptions(activeBucket!=='all'?activeBucket:'')}</select>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;"><label>Bucket</label><select id="ilBucket">${bucketOptions(activeBucket!=='all'?activeBucket:'')}</select></div>
+        <div style="flex:1;"><label>Notitieboek</label><select id="ilNotebook"><option value="">Geen notitieboek</option>${notebookOptions(activeNB!=='all'?activeNB:null)}</select></div>
+      </div>
       <div class="sheet-actions"><button class="act" id="ilCancel">Annuleren</button><button class="act primary" id="ilSave">Toevoegen</button></div>`;
     openSheet('\u{1F517} Link toevoegen', body, (ov,close)=>{
       $('ilCancel').onclick=close;
@@ -5917,8 +5926,9 @@ Als Daan op enig moment aangeeft dat je het gesprek moet bewaren \u2014 bijvoorb
         const url=$('ilUrl').value.trim(); if(!url){ toast('Plak een link.'); return; }
         const kind=(ytEmbed(url)||vimeoEmbed(url))?'video':'link';
         const { data:{ user } }=await sb.auth.getUser();
-        const { data:row }=await sb.from('inspiration').insert({ user_id:user.id, kind, url, title:$('ilTitle').value.trim()||null, content:$('ilNote').value.trim()||null, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:$('ilBucket').value||null }).select().single();
-        if(row && activeNB!=='all') await setLinks('inspiration_notebook_links','inspiration_id',row.id,'notebook_id',[activeNB]);
+        const nbVal=$('ilNotebook').value||null;
+        const { data:row }=await sb.from('inspiration').insert({ user_id:user.id, kind, url, title:$('ilTitle').value.trim()||null, content:$('ilNote').value.trim()||null, notebook_id:nbVal, bucket_id:$('ilBucket').value||null }).select().single();
+        if(row && nbVal) await setLinks('inspiration_notebook_links','inspiration_id',row.id,'notebook_id',[nbVal]);
         close(); loadInspiration();
       };
     });
@@ -5927,7 +5937,10 @@ Als Daan op enig moment aangeeft dat je het gesprek moet bewaren \u2014 bijvoorb
     const body=`
       <label>Titel (optioneel)</label><input type="text" id="inTitle" placeholder="Kop">
       <label>Tekst</label><textarea id="inTxt" placeholder="Je losse gedachte, quote of vonk\u2026" style="min-height:130px;"></textarea>
-      <label>Bucket</label><select id="inBucket">${bucketOptions(activeBucket!=='all'?activeBucket:'')}</select>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;"><label>Bucket</label><select id="inBucket">${bucketOptions(activeBucket!=='all'?activeBucket:'')}</select></div>
+        <div style="flex:1;"><label>Notitieboek</label><select id="inNotebook"><option value="">Geen notitieboek</option>${notebookOptions(activeNB!=='all'?activeNB:null)}</select></div>
+      </div>
       <div class="sheet-actions"><button class="act" id="inCancel">Annuleren</button><button class="act primary" id="inSave">Toevoegen</button></div>`;
     openSheet('\u{1F4DD} Los briefje', body, (ov,close)=>{
       $('inCancel').onclick=close;
@@ -5935,8 +5948,9 @@ Als Daan op enig moment aangeeft dat je het gesprek moet bewaren \u2014 bijvoorb
         const txt=$('inTxt').value.trim(); if(!txt){ toast('Schrijf iets.'); return; }
         const { data:{ user } }=await sb.auth.getUser();
         const titleInput=$('inTitle').value.trim();
-        const { data:row }=await sb.from('inspiration').insert({ user_id:user.id, kind:'note', title:titleInput||null, content:txt, notebook_id:activeNB!=='all'?activeNB:null, bucket_id:$('inBucket').value||null }).select().single();
-        if(row && activeNB!=='all') await setLinks('inspiration_notebook_links','inspiration_id',row.id,'notebook_id',[activeNB]);
+        const nbVal=$('inNotebook').value||null;
+        const { data:row }=await sb.from('inspiration').insert({ user_id:user.id, kind:'note', title:titleInput||null, content:txt, notebook_id:nbVal, bucket_id:$('inBucket').value||null }).select().single();
+        if(row && nbVal) await setLinks('inspiration_notebook_links','inspiration_id',row.id,'notebook_id',[nbVal]);
         close(); loadInspiration();
         if(!titleInput && row && txt.length>15) autoTitleInspiration(row.id,txt);
       };
